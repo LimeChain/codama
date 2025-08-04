@@ -1,3 +1,4 @@
 export { renderVisitor as renderJavaScriptVisitor } from '@codama/renderers-js';
+export { renderVisitor as renderDartVisitor } from '@codama/renderers-dart';
 export { renderVisitor as renderJavaScriptUmiVisitor } from '@codama/renderers-js-umi';
 export { renderVisitor as renderRustVisitor } from '@codama/renderers-rust';

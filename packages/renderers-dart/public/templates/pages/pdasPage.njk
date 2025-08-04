@@ -1,0 +1,91 @@
+{% extends "layout.njk" %}
+{% import "macros.njk" as macros %}
+
+{% block main %}
+{{ imports }}
+
+/// Generated helper class for the {{ pda.name | pascalCase }} PDA.
+///
+{% if pda.docs.length > 0 %}
+{% for doc in pda.docs %}
+/// {{ doc }}
+{% endfor %}
+{% endif %}
+class {{ pda.name | pascalCase }}Pda {
+  /// The program ID that owns this PDA.
+  static final PublicKey programId = {{ program.name | pascalCase }}Program.programId;
+
+  {% for seed in pda.seeds %}
+  {% if seed.kind === 'constantPdaSeedNode' %}
+  /// Constant seed: '{{ seed.value.kind === 'stringValueNode' ? seed.value.value : seed.value.kind }}'
+  static final Uint8List {{ seed.name | camelCase }}Seed = Uint8List.fromList(utf8.encode('{{ seed.value.kind === 'stringValueNode' ? seed.value.value : seed.value.kind }}'));
+  {% endif %}
+  {% endfor %}
+
+  /// Finds the program address for this PDA.
+  /// 
+  /// Returns a tuple with the address and bump seed.
+  static (PublicKey, int) findProgramAddress({
+    {% for seed in pda.seeds %}
+    {% if seed.kind === 'variablePdaSeedNode' %}
+    required {{ seed.resolvedType.type }} {{ seed.name | camelCase }},
+    {% endif %}
+    {% endfor %}
+  }) {
+    return PublicKey.findProgramAddressSync(
+      [
+        {% for seed in pda.seeds %}
+        {% if seed.kind === 'constantPdaSeedNode' and seed.value.kind === 'programIdValueNode' %}
+        programId.toBytes(),
+        {% elif seed.kind === 'constantPdaSeedNode' %}
+        {{ seed.name | camelCase }}Seed,
+        {% elif seed.kind === 'variablePdaSeedNode' and seed.resolvedType.kind === 'publicKeyTypeNode' %}
+        {{ seed.name | camelCase }}.toBytes(),
+        {% elif seed.kind === 'variablePdaSeedNode' and seed.resolvedType.kind === 'bytesTypeNode' %}
+        {{ seed.name | camelCase }},
+        {% elif seed.kind === 'variablePdaSeedNode' and seed.resolvedType.kind === 'numberTypeNode' %}
+        Uint8List.fromList([{{ seed.name | camelCase }}]),
+        {% else %}
+        utf8.encode({{ seed.name | camelCase }}.toString()),
+        {% endif %}
+        {% endfor %}
+      ],
+      programId,
+    );
+  }
+
+  /// Creates a program address for this PDA with a specific bump seed.
+  /// 
+  /// Throws an error if the resulting address is not a valid program address.
+  static PublicKey createProgramAddress({
+    {% for seed in pda.seeds %}
+    {% if seed.kind === 'variablePdaSeedNode' %}
+    required {{ seed.resolvedType.type }} {{ seed.name | camelCase }},
+    {% endif %}
+    {% endfor %}
+    required int bumpSeed,
+  }) {
+    return PublicKey.createProgramAddressSync(
+      [
+        {% for seed in pda.seeds %}
+        {% if seed.kind === 'constantPdaSeedNode' and seed.value.kind === 'programIdValueNode' %}
+        programId.toBytes(),
+        {% elif seed.kind === 'constantPdaSeedNode' %}
+        {{ seed.name | camelCase }}Seed,
+        {% elif seed.kind === 'variablePdaSeedNode' and seed.resolvedType.kind === 'publicKeyTypeNode' %}
+        {{ seed.name | camelCase }}.toBytes(),
+        {% elif seed.kind === 'variablePdaSeedNode' and seed.resolvedType.kind === 'bytesTypeNode' %}
+        {{ seed.name | camelCase }},
+        {% elif seed.kind === 'variablePdaSeedNode' and seed.resolvedType.kind === 'numberTypeNode' %}
+        Uint8List.fromList([{{ seed.name | camelCase }}]),
+        {% else %}
+        utf8.encode({{ seed.name | camelCase }}.toString()),
+        {% endif %}
+        {% endfor %}
+        Uint8List.fromList([bumpSeed]),
+      ],
+      programId,
+    );
+  }
+}
+{% endblock %}

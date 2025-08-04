@@ -1,0 +1,18 @@
+{# Write a Dart documentation comment from an array of strings. #}
+{% macro docblock(docs) %}
+{% for doc in docs %}
+/// {{ doc }}
+{% endfor %}
+{% endmacro %}
+
+{# Generate a Dart class property with documentation #}
+{% macro property(type, name, doc, nullable = false) %}
+{% if doc %}{{ docblock([doc]) }}{% endif %}
+  {{ type }}{% if nullable %}?{% endif %} {{ name }};
+{% endmacro %}
+
+{# Generate a Dart final class property with documentation #}
+{% macro finalProperty(type, name, doc, nullable = false) %}
+{% if doc %}{{ docblock([doc]) }}{% endif %}
+  final {{ type }}{% if nullable %}?{% endif %} {{ name }};
+{% endmacro %}

@@ -1,0 +1,35 @@
+{% extends "layout.njk" %}
+{% import "macros.njk" as macros %}
+
+{% block main %}
+// Entry point for the {{ root.name }} SDK.
+// This file exports all the modules in the SDK.
+
+{% if programsToExport.length > 0 %}
+export 'programs.dart';
+{% endif %}
+
+{% if errorsToExport.length > 0 %}
+export 'errors.dart';
+{% endif %}
+
+{% if pdasToExport.length > 0 %}
+export 'pdas.dart';
+{% endif %}
+
+{% if accountsToExport.length > 0 %}
+export 'accounts.dart';
+{% endif %}
+
+{% if instructionsToExport.length > 0 %}
+export 'instructions.dart';
+{% endif %}
+
+{% if definedTypesToExport.length > 0 %}
+export 'types.dart';
+{% endif %}
+
+{% if accountsToExport.length > 0 %}
+export 'shared.dart';
+{% endif %}
+{% endblock %}
