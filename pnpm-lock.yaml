@@ -207,6 +207,9 @@ importers:
 
   packages/renderers:
     dependencies:
+      '@codama/renderers-dart':
+        specifier: workspace:*
+        version: link:../renderers-dart
       '@codama/renderers-js':
         specifier: workspace:*
         version: link:../renderers-js
@@ -228,6 +231,37 @@ importers:
       '@codama/visitors-core':
         specifier: workspace:*
         version: link:../visitors-core
+
+  packages/renderers-dart:
+    dependencies:
+      '@codama/errors':
+        specifier: workspace:*
+        version: link:../errors
+      '@codama/nodes':
+        specifier: workspace:*
+        version: link:../nodes
+      '@codama/renderers-core':
+        specifier: workspace:*
+        version: link:../renderers-core
+      '@codama/visitors-core':
+        specifier: workspace:*
+        version: link:../visitors-core
+      '@solana/codecs-strings':
+        specifier: ^2.3.0
+        version: 2.3.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.8.3)
+      nunjucks:
+        specifier: ^3.2.4
+        version: 3.2.4(chokidar@3.6.0)
+      prettier:
+        specifier: ^3.6.2
+        version: 3.6.2
+    devDependencies:
+      '@codama/nodes-from-anchor':
+        specifier: workspace:*
+        version: link:../nodes-from-anchor
+      '@types/nunjucks':
+        specifier: ^3.2.6
+        version: 3.2.6
 
   packages/renderers-js:
     dependencies:

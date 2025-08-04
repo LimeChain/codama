@@ -1,0 +1,12 @@
+{% extends "layout.njk" %}
+{% import "macros.njk" as macros %}
+
+{% block main %}
+// This file exports error classes for all programs in the SDK.
+
+{% for program in programsToExport %}
+{% if program.errors.length > 0 %}
+export 'errors/{{ program.name | snakeCase }}.dart';
+{% endif %}
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "layout.njk" %}
+{% import "macros.njk" as macros %}
+
+{% block main %}
+// This file exports PDA helper classes for all PDAs in the SDK.
+
+{% for pda in pdasToExport %}
+export 'pdas/{{ pda.name | snakeCase }}.dart';
+{% endfor %}
+{% endblock %}

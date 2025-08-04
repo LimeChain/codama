@@ -1,7 +1,7 @@
 {
-    "name": "@codama/renderers",
-    "version": "1.0.31",
-    "description": "Exports all Codama renderers",
+    "name": "@codama/renderers-dart",
+    "version": "0.1.0",
+    "description": "Dart renderer compatible with the Solana Kit library",
     "exports": {
         "types": "./dist/types/index.d.ts",
         "node": {
@@ -23,7 +23,9 @@
         "solana",
         "framework",
         "standard",
-        "renderers"
+        "renderers",
+        "dart",
+        "client"
     ],
     "scripts": {
         "build": "rimraf dist && pnpm build:src && pnpm build:types",
@@ -32,16 +34,25 @@
         "dev": "zx ../../node_modules/@codama/internals/scripts/test-unit.mjs node --watch",
         "lint": "zx ../../node_modules/@codama/internals/scripts/lint.mjs",
         "lint:fix": "zx ../../node_modules/@codama/internals/scripts/lint.mjs --fix",
-        "test": "pnpm test:types && pnpm test:treeshakability && pnpm test:node",
+        "test": "pnpm test:types && pnpm test:treeshakability && pnpm test:node && pnpm test:e2e && pnpm test:exports",
+        "test:e2e": "./e2e/test.sh",
+        "test:exports": "node ./test/exports/module.mjs && node ./test/exports/commonjs.cjs",
         "test:node": "zx ../../node_modules/@codama/internals/scripts/test-unit.mjs node",
         "test:treeshakability": "zx ../../node_modules/@codama/internals/scripts/test-treeshakability.mjs",
         "test:types": "zx ../../node_modules/@codama/internals/scripts/test-types.mjs"
     },
     "dependencies": {
-        "@codama/renderers-js": "workspace:*",
-        "@codama/renderers-dart": "workspace:*",
-        "@codama/renderers-js-umi": "workspace:*",
-        "@codama/renderers-rust": "workspace:*"
+        "@codama/errors": "workspace:*",
+        "@codama/nodes": "workspace:*",
+        "@codama/renderers-core": "workspace:*",
+        "@codama/visitors-core": "workspace:*",
+        "@solana/codecs-strings": "^2.3.0",
+        "nunjucks": "^3.2.4",
+        "prettier": "^3.6.2"
+    },
+    "devDependencies": {
+        "@codama/nodes-from-anchor": "workspace:*",
+        "@types/nunjucks": "^3.2.6"
     },
     "license": "MIT",
     "repository": {

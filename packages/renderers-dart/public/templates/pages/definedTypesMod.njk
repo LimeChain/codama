@@ -1,0 +1,10 @@
+{% extends "layout.njk" %}
+{% import "macros.njk" as macros %}
+
+{% block main %}
+// This file exports custom data types for the SDK.
+
+{% for definedType in definedTypesToExport %}
+export 'types/{{ definedType.name | snakeCase }}.dart';
+{% endfor %}
+{% endblock %}
