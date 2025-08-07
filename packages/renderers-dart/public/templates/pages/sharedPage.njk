@@ -12,7 +12,7 @@ import 'package:solana/solana.dart';
 /// Account not found error.
 class AccountNotFoundError extends Error {
   /// The address of the account that was not found.
-  final PublicKey address;
+  final Ed25519HDPublicKey address;
 
   /// Creates a new AccountNotFoundError.
   AccountNotFoundError(this.address);
