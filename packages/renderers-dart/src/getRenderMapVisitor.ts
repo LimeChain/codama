@@ -8,7 +8,11 @@ import {
     InstructionNode,
     pascalCase,
     snakeCase,
+    resolveNestedTypeNode,
     structTypeNodeFromInstructionArgumentNodes,
+    AccountNode,
+    isNode,
+    ConstantDiscriminatorNode,
 } from '@codama/nodes';
 import { RenderMap } from '@codama/renderers-core';
 import {
@@ -33,6 +37,55 @@ export type GetRenderMapOptions = {
     linkOverrides?: LinkOverrides;
     renderParentInstructions?: boolean;
 };
+
+function extractDiscriminatorBytes(node: AccountNode): number[] {
+    const d = (node.discriminators ?? []).find(
+        (d): d is ConstantDiscriminatorNode => d.kind === 'constantDiscriminatorNode',
+    );
+
+    if (d && isNode(d.constant?.value, 'arrayValueNode')) {
+        const elements = d.constant.value.items;
+        if (
+            Array.isArray(elements) &&
+            elements.every((el) => isNode(el, 'numberValueNode'))
+        ) {
+            return elements.map((el) => el.number);
+        }
+    }
+
+    const fields = resolveNestedTypeNode(node.data).fields;
+    const discriminatorField = fields.find((f) => f.name === 'discriminator');
+    if (
+        discriminatorField &&
+        isNode(discriminatorField.defaultValue, 'bytesValueNode') &&
+        typeof discriminatorField.defaultValue.data === 'string'
+    ) {
+        const hex = discriminatorField.defaultValue.data;
+        const buffer = Buffer.from(hex, 'hex');
+        return Array.from(buffer);
+    }
+
+    return [];
+}
+
+
+function extractFieldsFromTypeManifest(typeManifest: TypeManifest): { name: string, type: string, field: string }[] {
+    return typeManifest.type
+        .split('\n')
+        .map((line) => {
+            const match = line.trim().match(/^final\s+([\w<>, ?]+)\s+(\w+);$/);
+            if (match && match[2] !== 'discriminator') {
+                return {
+                    name: match[2],
+                    type: match[1].replace(/\?$/, ''),
+                    field: line,
+                };
+            }
+            return null;
+        })
+        .filter((entry): entry is { name: string; type: string; field: string } => entry !== null);
+}
+
 
 export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<RenderMap,
     | 'rootNode'
@@ -70,14 +123,20 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                 visitAccount(node) {
                     const typeManifest = visit(node, typeManifestVisitor) as TypeManifest;
                     const { imports } = typeManifest;
+
                     return new RenderMap().add(
                         `accounts/${snakeCase(node.name)}.dart`,
                         renderTemplate('accountsPage.njk', {
-                            account: node,
+                            account: {
+                                ...node,
+                                discriminator: extractDiscriminatorBytes(node)
+                            },
                             imports: imports
                                 .remove(`generatedAccounts::${pascalCase(node.name)}`, [pascalCase(node.name)])
                                 .toString(dependencyMap),
                             typeManifest,
+                            fields: extractFieldsFromTypeManifest(typeManifest),
+
                         }),
                     );
                 },

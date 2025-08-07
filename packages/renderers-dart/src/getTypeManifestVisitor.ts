@@ -253,8 +253,8 @@ ${variantNames}
 
                 visitPublicKeyType() {
                     return {
-                        imports: new ImportMap(),
-                        type: 'String',
+                        imports: new ImportMap().add('package:solana/solana.dart', ['Ed25519HDPublicKey']),
+                        type: 'Ed25519HDPublicKey',
                         nestedStructs: [],
                     };
                 },
@@ -285,9 +285,8 @@ ${variantNames}
                     const originalInlineStruct = inlineStruct;
                     const originalNestedStruct = nestedStruct;
 
-                    // Use a default name if no parent name is available
                     const fieldParentName = originalParentName || 'AnonymousStruct';
-                    
+
                     parentName = pascalCase(fieldParentName) + pascalCase(structFieldType.name);
                     nestedStruct = true;
                     inlineStruct = false;
@@ -303,7 +302,10 @@ ${variantNames}
 
                     return {
                         ...fieldManifest,
-                        type: `${docblock}final ${fieldManifest.type} ${fieldName};`,
+                        type: fieldManifest.type,
+                        nestedStructs: fieldManifest.nestedStructs,
+                        imports: fieldManifest.imports,
+                        field: `${docblock}  final ${fieldManifest.type} ${fieldName};`,
                     };
                 },
 
@@ -315,7 +317,7 @@ ${variantNames}
                     const fields = structType.fields.map((field: any) =>
                         visit(field, self) as TypeManifest
                     );
-                    const fieldTypes = fields.map((field: any) => field.type).join('\n');
+                    const fieldTypes = fields.map((field: any) => field.field).join('\n');
                     const mergedManifest = {
                         imports: new ImportMap().mergeWith(...fields.map((f: any) => f.imports)),
                         nestedStructs: fields.flatMap((f: any) => f.nestedStructs),

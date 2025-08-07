@@ -1,18 +1,71 @@
 {# Write a Dart documentation comment from an array of strings. #}
 {% macro docblock(docs) %}
-{% for doc in docs %}
+  {% for doc in docs %}
 /// {{ doc }}
-{% endfor %}
+  {% endfor %}
 {% endmacro %}
 
 {# Generate a Dart class property with documentation #}
 {% macro property(type, name, doc, nullable = false) %}
-{% if doc %}{{ docblock([doc]) }}{% endif %}
-  {{ type }}{% if nullable %}?{% endif %} {{ name }};
+  {% if doc %}{{ docblock([doc]) }}
+  {% endif %}
+  {{ type }}
+  {% if nullable %}?{% endif %}
+  {{ name }};
 {% endmacro %}
 
 {# Generate a Dart final class property with documentation #}
 {% macro finalProperty(type, name, doc, nullable = false) %}
-{% if doc %}{{ docblock([doc]) }}{% endif %}
-  final {{ type }}{% if nullable %}?{% endif %} {{ name }};
+  {% if doc %}{{ docblock([doc]) }}
+  {% endif %}
+  final {{ type }}
+  {% if nullable %}?{% endif %}
+  {{ name }};
+{% endmacro %}
+
+{# Default constructor for a Dart class with required fields #}
+{% macro defaultConstructor(className, fields) %}
+  {% if fields.length > 0 %}
+    {{ className }}({
+    {% for field in fields %}
+    required this.{{ field.name }},
+    {% endfor %}
+  });
+  {% else %}
+    {{ className }}();
+  {% endif %}
+{% endmacro %}
+
+{# Generates Borsh read logic for a field #}
+{% macro borshReader(field) %}
+  {% if field.type == 'int' %}
+    reader.readU8()
+  {% elif field.type == 'BigInt' %}
+    reader.readU64()
+  {% elif field.type == 'String' %}
+    reader.readString()
+  {% elif field.type == 'Uint8List' %}
+    reader.readFixedArray({{ field.size or 8 }})
+{% elif field.type == 'Ed25519HDPublicKey' %}
+  Ed25519HDPublicKey(Uint8List.fromList(reader.readFixedArray(32)))
+  {% else %}
+    reader.readUnknownType('{{ field.type }}')
+  {% endif %}
+{% endmacro %}
+
+{# Generates Borsh write logic for a field #}
+{% macro borshWriter(field) %}
+  {% if field.type == 'int' %}
+    writer.writeU8({{ field.name }})
+  {% elif field.type == 'BigInt' %}
+    writer.writeU64({{ field.name }})
+  {% elif field.type == 'String' %}
+    writer.writeString({{ field.name }})
+  {% elif field.type == 'Uint8List' %}
+    writer.writeFixedArray({{ field.name }})
+{% elif field.type == 'Ed25519HDPublicKey' %}
+  writer.writeFixedArray(Uint8List.fromList({{ field.name }}.bytes))
+  {% else %}
+    writer.writeUnknownType('{{ field.type }}')
+  {% endif %}
 {% endmacro %}

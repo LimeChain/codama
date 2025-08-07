@@ -2,62 +2,80 @@
 {% import "macros.njk" as macros %}
 
 {% block main %}
-{{ imports }}
+  import '../shared.dart';
+  import 'package:collection/collection.dart';
+  import 'package:solana/dto.dart';
+  {{ imports }}
 
 /// Generated account class for {{ account.name | pascalCase }}.
 ///
 {% if account.docs.length > 0 %}
-{% for doc in account.docs %}
+    {% for doc in account.docs %}
 /// {{ doc }}
-{% endfor %}
-{% endif %}
+    {% endfor %}
+  {% endif %}
 class {{ account.name | pascalCase }} {
+  {% if account.discriminator %}
+  static final Uint8List discriminator = Uint8List.fromList([{{ account.discriminator | join(', ') }}]);
+  {% endif %}
+
   {% if account.size != null %}
   /// The size of this account.
   static const int size = {{ account.size }};
   {% endif %}
 
-  {% if account.discriminator %}
-  /// The discriminator bytes for this account.
-  static final Uint8List discriminator = Uint8List.fromList([
-    {% for byte in account.discriminator %}{{ byte }}{% if not loop.last %}, {% endif %}{% endfor %}
-  ]);
-  {% endif %}
-
-  {% for nestedStruct in typeManifest.nestedStructs %}
-  {{ nestedStruct }}
+  // Fields
+{% for field in fields %}
+    {{ field.field }}
   {% endfor %}
 
-  {{ typeManifest.type | safe | replace('class ' + account.name | pascalCase, '') | trim }}
+  // Constructor
+ {{ macros.defaultConstructor(account.name | pascalCase, fields) }}
 
+/// Deserializes this account from borsh.
+static {{ account.name | pascalCase }} fromBorsh(BinaryReader reader) {
+  return {{ account.name | pascalCase }}(
+    {% for field in fields %}
+    {{ field.name }}: {{ macros.borshReader(field) }},
+    {% endfor %}
+  );
+}
+
+
+/// Serializes this account to borsh.
+void toBorsh(BinaryWriter writer) {
+{% for field in fields %}
+    {{ macros.borshWriter(field) }};
+{% endfor %}
+}
   /// Creates a [{{ account.name | pascalCase }}] from its bytes representation.
   static {{ account.name | pascalCase }} fromBytes(Uint8List data) {
     final buffer = ByteData.view(data.buffer);
     final reader = BinaryReader(buffer);
-    
+
     {% if account.discriminator %}
     // Validate the discriminator
     final discriminator = reader.readFixedArray(8);
-    if (!listEquals(discriminator, {{ account.name | pascalCase }}.discriminator)) {
+    if (!const ListEquality().equals(discriminator, {{ account.name | pascalCase }}.discriminator)) {
       throw FormatException('Invalid account discriminator');
     }
     {% endif %}
-    
+
     return {{ account.name | pascalCase }}.fromBorsh(reader);
   }
 
   /// Serializes this account to its bytes representation.
   Uint8List toBytes() {
     final writer = BinaryWriter();
-    
+
     {% if account.discriminator %}
     // Write discriminator
     writer.writeFixedArray({{ account.name | pascalCase }}.discriminator);
     {% endif %}
-    
+
     // Write account data
     toBorsh(writer);
-    
+
     return writer.toBytes();
   }
 
@@ -67,15 +85,16 @@ class {{ account.name | pascalCase }} {
   /// Returns a tuple containing the PDA and bump seed.
   static (PublicKey, int) findProgramAddress(
     {% for seed in seeds %}
-    {% if seed.kind === 'variablePdaSeedNode' %}
-    {{ seed.typeManifest.type }} {{ seed.name | camelCase }},
+      {% if seed.kind === 'variablePdaSeedNode' %}
+        {{ seed.typeManifest.type }}
+        {{ seed.name | camelCase }},
     {% endif %}
     {% endfor %}
   ) {
     return PublicKey.findProgramAddressSync(
       [
         {% for seed in seeds %}
-        {% if seed.kind === 'constantPdaSeedNode' and seed.value.kind === 'programIdValueNode' %}
+      {% if seed.kind === 'constantPdaSeedNode' and seed.value.kind === 'programIdValueNode' %}
         {{ program.name | pascalCase }}Program.programId.toBytes(),
         {% elif seed.kind === 'constantPdaSeedNode' %}
         utf8.encode('{{ seed.valueManifest.render | replace("\"", "") }}'),
@@ -94,24 +113,31 @@ class {{ account.name | pascalCase }} {
   {% endif %}
 
   /// Fetches a [{{ account.name | pascalCase }}] from the blockchain.
-  static Future<{{ account.name | pascalCase }}> fetch(
-    Connection connection,
-    PublicKey address,
+  static Future<{{ account.name | pascalCase  }}> fetch(
+    RpcClient client,
+    Ed25519HDPublicKey address,
   ) async {
-    final accountInfo = await connection.getAccountInfo(address);
-    if (accountInfo == null) {
+    final accountInfo = await client.getAccountInfo(address.toBase58());
+    final data = accountInfo.value?.data;
+
+    if (data == null) {
       throw AccountNotFoundError(address);
     }
-    return fromBytes(accountInfo.data);
+
+    if (data is! BinaryAccountData) {
+      throw FormatException('Expected binary account data, got ${data.runtimeType}');
+    }
+
+    return fromBytes(Uint8List.fromList(data.data));
   }
 
   /// Fetches a [{{ account.name | pascalCase }}] from the blockchain if it exists.
   static Future<{{ account.name | pascalCase }}?> fetchNullable(
-    Connection connection,
-    PublicKey address,
+    RpcClient client,
+    Ed25519HDPublicKey address,
   ) async {
     try {
-      return await fetch(connection, address);
+      return await fetch(client, address);
     } catch (e) {
       if (e is AccountNotFoundError) {
         return null;
