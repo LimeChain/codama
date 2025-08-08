@@ -1,22 +1,19 @@
-import { logWarn } from '@codama/errors';
 import {
     getAllAccounts,
     getAllDefinedTypes,
     getAllInstructionsWithSubs,
     getAllPdas,
     getAllPrograms,
-    InstructionNode,
     pascalCase,
     snakeCase,
     resolveNestedTypeNode,
     structTypeNodeFromInstructionArgumentNodes,
-    AccountNode,
-    isNode,
-    ConstantDiscriminatorNode,
+    camelCase,
 } from '@codama/nodes';
 import { RenderMap } from '@codama/renderers-core';
 import {
     extendVisitor,
+    findProgramNodeFromPath,
     LinkableDictionary,
     NodeStack,
     pipe,
@@ -30,44 +27,13 @@ import { join } from 'path';
 
 import { getTypeManifestVisitor, TypeManifest } from './getTypeManifestVisitor';
 import { ImportMap } from './ImportMap';
-import { getImportFromFactory, LinkOverrides, render } from './utils';
+import { extractDiscriminatorBytes, getImportFromFactory, LinkOverrides, render } from './utils';
 
 export type GetRenderMapOptions = {
     dependencyMap?: Record<string, string>;
     linkOverrides?: LinkOverrides;
     renderParentInstructions?: boolean;
 };
-
-function extractDiscriminatorBytes(node: AccountNode): number[] {
-    const d = (node.discriminators ?? []).find(
-        (d): d is ConstantDiscriminatorNode => d.kind === 'constantDiscriminatorNode',
-    );
-
-    if (d && isNode(d.constant?.value, 'arrayValueNode')) {
-        const elements = d.constant.value.items;
-        if (
-            Array.isArray(elements) &&
-            elements.every((el) => isNode(el, 'numberValueNode'))
-        ) {
-            return elements.map((el) => el.number);
-        }
-    }
-
-    const fields = resolveNestedTypeNode(node.data).fields;
-    const discriminatorField = fields.find((f) => f.name === 'discriminator');
-    if (
-        discriminatorField &&
-        isNode(discriminatorField.defaultValue, 'bytesValueNode') &&
-        typeof discriminatorField.defaultValue.data === 'string'
-    ) {
-        const hex = discriminatorField.defaultValue.data;
-        const buffer = Buffer.from(hex, 'hex');
-        return Array.from(buffer);
-    }
-
-    return [];
-}
-
 
 function extractFieldsFromTypeManifest(typeManifest: TypeManifest): { name: string, type: string, field: string }[] {
     return typeManifest.type
@@ -85,7 +51,6 @@ function extractFieldsFromTypeManifest(typeManifest: TypeManifest): { name: stri
         })
         .filter((entry): entry is { name: string; type: string; field: string } => entry !== null);
 }
-
 
 export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<RenderMap,
     | 'rootNode'
@@ -124,6 +89,12 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                     const typeManifest = visit(node, typeManifestVisitor) as TypeManifest;
                     const { imports } = typeManifest;
 
+                    imports.add('dartTypedData', new Set(['Uint8List', 'ByteData']));
+                    imports.add('package:collection/collection.dart', new Set(['ListEquality']));
+                    imports.add('package:solana/dto.dart', new Set(['AccountResult', 'BinaryAccountData']));
+                    imports.add('package:solana/solana.dart', new Set(['RpcClient', 'Ed25519HDPublicKey']));
+                    imports.add('../shared.dart', new Set(['BinaryReader', 'BinaryWriter', 'AccountNotFoundError']));
+
                     return new RenderMap().add(
                         `accounts/${snakeCase(node.name)}.dart`,
                         renderTemplate('accountsPage.njk', {
@@ -156,33 +127,55 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                 },
 
                 visitInstruction(node) {
-                    const imports = new ImportMap();
-                    const accountsAndArgsConflicts = getConflictsForInstructionAccountsAndArgs(node);
-                    if (accountsAndArgsConflicts.length > 0) {
-                        logWarn(
-                            `[Dart] Accounts and args of instruction [${node.name}] have the following ` +
-                            `conflicting attributes [${accountsAndArgsConflicts.join(', ')}]. ` +
-                            `Thus, the conflicting arguments will be suffixed with "_arg". ` +
-                            'You may want to rename the conflicting attributes.',
-                        );
+                    const instructionPath = stack.getPath('instructionNode');
+                    const programNode = findProgramNodeFromPath(instructionPath);
+                    if (!programNode) {
+                        throw new Error('Instruction must be visited inside a program.');
                     }
 
+                    const imports = new ImportMap();
                     const struct = structTypeNodeFromInstructionArgumentNodes(node.arguments);
                     const typeManifest = visit(struct, typeManifestVisitor) as TypeManifest;
                     imports.mergeWith(typeManifest.imports);
 
-                    const hasArgs = node.arguments && node.arguments.length > 0;
+                    imports
+                        .add('dartTypedData', new Set(['Uint8List']))
+                        .add('package:solana/solana.dart', new Set(['Ed25519HDPublicKey']))
+                        .add('package:solana/encoder.dart', new Set(['Instruction', 'AccountMeta', 'ByteArray']))
+                        .add('../shared.dart', new Set(['BinaryWriter']))
+                        .add('../programs.dart', new Set([`${pascalCase(programNode.name)}Program`]));
 
-                    const importsString = imports
-                        .remove(`generatedInstructions::${pascalCase(node.name)}`, [pascalCase(node.name)])
-                        .toString(dependencyMap) || '';
+                    const importsString =
+                        imports
+                            .remove(`generatedInstructions::${pascalCase(node.name)}`, [pascalCase(node.name)])
+                            .toString(dependencyMap) || '';
+
+                    const args = node.arguments
+                        .filter(a => a.name !== 'discriminator')
+                        .map(a => {
+                            const argManifest = visit(a.type, getTypeManifestVisitor({
+                                getImportFrom,
+                                nestedStruct: true,
+                                parentName: `${pascalCase(node.name)}InstructionArgs`,
+                            })) as TypeManifest;
+                            imports.mergeWith(argManifest.imports);
+                            const rt = resolveNestedTypeNode(a.type);
+                            return {
+                                name: camelCase(a.name),
+                                dartType: argManifest.type,
+                                resolvedType: rt,
+                            };
+                        });
 
                     const context = {
                         imports: importsString,
-                        instruction: node,
+                        instruction: {
+                            ...node,
+                            discriminator: extractDiscriminatorBytes(node),
+                        },
+                        args,
                         typeManifest: typeManifest || { nestedStructs: [] },
-                        hasArgs,
-                        program: { name: pascalCase(node.name || '') }
+                        program: { name: pascalCase(programNode.name || '') },
                     };
 
                     return new RenderMap().add(
@@ -282,13 +275,4 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
         (v) => recordNodeStackVisitor(v, stack),
         (v) => recordLinkablesOnFirstVisitVisitor(v, linkables),
     );
-}
-
-function getConflictsForInstructionAccountsAndArgs(instruction: InstructionNode): string[] {
-    const allNames = [
-        ...instruction.accounts.map((account: any) => account.name),
-        ...instruction.arguments.map((argument: any) => argument.name),
-    ];
-    const duplicates = allNames.filter((e, i, a) => a.indexOf(e) !== i);
-    return [...new Set(duplicates)];
 }
