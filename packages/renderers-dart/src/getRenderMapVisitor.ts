@@ -251,7 +251,14 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                         map.add('shared.dart', renderTemplate('sharedPage.njk', ctx));
                     }
                     if (programsToExport.length > 0) {
-                        map.add('programs.dart', renderTemplate('programsMod.njk', ctx));
+                        const programsImports = new ImportMap().add('package:solana/solana.dart', new Set(['Ed25519HDPublicKey']));
+                        map.add(
+                            'programs.dart',
+                            renderTemplate('programsMod.njk', {
+                                ...ctx,
+                                imports: programsImports.toString(dependencyMap),
+                            }),
+                        );
                         map.add('errors.dart', renderTemplate('errorsMod.njk', ctx));
                     }
                     if (pdasToExport.length > 0) {

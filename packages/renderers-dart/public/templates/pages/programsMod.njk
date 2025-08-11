@@ -4,15 +4,17 @@
 {% block main %}
 // This file exports program information for all programs in the SDK.
 
-{% for program in programsToExport %}
+{{ imports }}
+
+  {% for program in programsToExport %}
 /// Program information for the {{ program.name | pascalCase }} program.
 class {{ program.name | pascalCase }}Program {
   /// The program ID for the {{ program.name | pascalCase }} program.
-  static final PublicKey programId = PublicKey.fromBase58("{{ program.publicKey }}");
+  static final Ed25519HDPublicKey programId = Ed25519HDPublicKey.fromBase58("{{ program.publicKey }}");
   
   {% if program.metadata and program.metadata.address %}
   /// The program metadata address.
-  static final PublicKey metadataAddress = PublicKey.fromBase58("{{ program.metadata.address }}");
+  static final Ed25519HDPublicKey metadataAddress = Ed25519HDPublicKey.fromBase58("{{ program.metadata.address }}");
   {% endif %}
 
   /// The program name.
