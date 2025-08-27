@@ -102,17 +102,84 @@ class BinaryReader {
     return utf8.decode(bytes);
   }
 
-  /// Reads a fixed-size array of bytes.
-  Uint8List readFixedArray(int length) {
-    final bytes = Uint8List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+  /// Reads a fixed-size u8 array of bytes.
+  Uint8List readFixedU8Array(int length) {
+    final bytes =
+        Uint8List.view(_data.buffer, _data.offsetInBytes + _offset, length);
     _offset += length;
     return bytes;
+  }
+
+  /// Reads a fixed-size i8 array of bytes.
+  Int8List readFixedI8Array(int length) {
+    final bytes =
+        Int8List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length;
+    return bytes;
+  }
+
+  /// Reads a fixed-size u16 array of bytes.
+  Uint16List readFixedU16Array(int length) {
+    final bytes =
+        Uint16List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length * 4;
+    return bytes;
+  }
+
+  /// Reads a fixed-size i16 array of bytes.
+  Int16List readFixedI16Array(int length) {
+    final bytes =
+        Int16List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length * 4;
+    return bytes;
+  }
+
+  /// Reads a fixed-size u32 array of bytes.
+  Uint32List readFixedU32Array(int length) {
+    final bytes =
+        Uint32List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length * 4;
+    return bytes;
+  }
+
+  /// Reads a fixed-size i32 array of bytes.
+  Int32List readFixedI32Array(int length) {
+    final bytes =
+        Int32List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length * 4;
+    return bytes;
+  }
+
+  /// Reads a fixed-size u64 array of bytes.
+  Uint64List readFixedU64Array(int length) {
+    final bytes =
+        Uint64List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length * 4;
+    return bytes;
+  }
+
+  /// Reads a fixed-size i64 array of bytes.
+  Int64List readFixedI64Array(int length) {
+    final bytes =
+        Int64List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length * 4;
+    return bytes;
+  }
+
+  /// Reads a variable-length array of generic items.
+  List<T> readArray<T>(T Function() itemReader) {
+    final count = readU32();
+    final result = <T>[];
+    for (var i = 0; i < count; i++) {
+      result.add(itemReader());
+    }
+    return result;
   }
 
   /// Reads a variable-length array of bytes.
   Uint8List readBytes() {
     final length = readU32();
-    return readFixedArray(length);
+    return readFixedU8Array(length);
   }
 }
 
@@ -192,8 +259,43 @@ class BinaryWriter {
     _bytes.addAll(bytes);
   }
 
-  /// Writes a fixed-size array of bytes.
-  void writeFixedArray(Uint8List value) {
+  /// Writes a fixed-size u8 array of bytes.
+  void writeFixedU8Array(Uint8List value) {
+    _bytes.addAll(value);
+  }
+
+  /// Writes a fixed-size i8 array of bytes.
+  void writeFixedI8Array(Int8List value) {
+    _bytes.addAll(value);
+  }
+
+  /// Writes a fixed-size u16 array of bytes.
+  void writeFixedU16Array(Uint16List value) {
+    _bytes.addAll(value);
+  }
+
+  /// Writes a fixed-size i16 array of bytes.
+  void writeFixedI16Array(Int16List value) {
+    _bytes.addAll(value);
+  }
+  
+  /// Writes a fixed-size u32 array of bytes.
+  void writeFixedU32Array(Uint32List value) {
+    _bytes.addAll(value);
+  }
+
+  /// Writes a fixed-size i32 array of bytes.
+  void writeFixedI32Array(Int32List value) {
+    _bytes.addAll(value);
+  }
+
+  /// Writes a fixed-size u64 array of bytes.
+  void writeFixedU64Array(Uint64List value) {
+    _bytes.addAll(value);
+  }
+
+  /// Writes a fixed-size i64 array of bytes.
+  void writeFixedI64Array(Int64List value) {
     _bytes.addAll(value);
   }
 
@@ -201,6 +303,14 @@ class BinaryWriter {
   void writeBytes(Uint8List value) {
     writeU32(value.length);
     _bytes.addAll(value);
+  }
+
+  /// Writes a variable-length array of generic items.
+  void writeArray<T>(List<T> items, void Function(T) itemWriter) {
+    writeU32(items.length);
+    for (final item in items) {
+      itemWriter(item);
+    }
   }
 
   /// Returns the byte array.
