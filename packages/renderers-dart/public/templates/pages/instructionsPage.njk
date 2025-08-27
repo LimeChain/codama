@@ -89,7 +89,7 @@ class {{ instruction.name | pascalCase }}Instruction {
     // Serialize: discriminator (8 bytes) + args
     final writer = BinaryWriter();
 {%- if instruction.discriminator and instruction.discriminator.length > 0 %}
-writer.writeFixedArray(Uint8List.fromList({{ instruction.name | snakeCase | upper }}_DISCRIMINATOR));
+writer.writeFixedU8Array(Uint8List.fromList({{ instruction.name | snakeCase | upper }}_DISCRIMINATOR));
 {%- endif %}
         {%- if args and args.length > 0 %}
           {%- for arg in args %}
@@ -100,7 +100,7 @@ writer.writeFixedArray(Uint8List.fromList({{ instruction.name | snakeCase | uppe
       {%- elif arg.resolvedType.kind === 'booleanTypeNode' %}
     writer.writeBool({{ arg.name }});
       {%- elif arg.resolvedType.kind === 'publicKeyTypeNode' %}
-    writer.writeFixedArray(Uint8List.fromList({{ arg.name }}.bytes));
+    writer.writeFixedU8Array(Uint8List.fromList({{ arg.name }}.bytes));
       {%- elif arg.resolvedType.kind === 'bytesTypeNode' %}
     writer.writeBytes({{ arg.name }});
       {%- else %}
