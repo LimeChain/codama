@@ -36,36 +36,120 @@
   {% endif %}
 {% endmacro %}
 
-{# Generates Borsh read logic for a field #}
+
+{# Recursive Borsh Reader, responsible for handling collections and any nested levels #}
 {% macro borshReader(field) %}
-  {% if field.type == 'int' %}
-    reader.readU8()
-  {% elif field.type == 'BigInt' %}
-    reader.readU64()
-  {% elif field.type == 'String' %}
-    reader.readString()
-  {% elif field.type == 'Uint8List' %}
-    reader.readFixedArray({{ field.size or 8 }})
-{% elif field.type == 'Ed25519HDPublicKey' %}
-  Ed25519HDPublicKey(Uint8List.fromList(reader.readFixedArray(32)))
+  {{ recursiveReader(field.nesting, field.baseType, field.isStruct) }}
+{% endmacro %}
+
+{% macro recursiveReader(depth, baseType, isStruct) %}
+  {% if depth == 0 %}
+    {% if isStruct %}
+      {{ baseType }}Borsh.fromBorsh(reader)
+    {% else %}
+      {{ baseTypeReader(baseType) }}
+    {% endif %}
   {% else %}
-    reader.readUnknownType('{{ field.type }}')
+    reader.readArray(() {
+      {% if isStruct %}
+        // item is a struct, call fromBorsh per item
+        return {{ baseType }}Borsh.fromBorsh(reader);
+      {% else %}
+        return {{ recursiveReader(depth - 1, baseType, false) }};
+      {% endif %}
+    })
   {% endif %}
 {% endmacro %}
 
-{# Generates Borsh write logic for a field #}
-{% macro borshWriter(field) %}
-  {% if field.type == 'int' %}
-    writer.writeU8({{ field.name }})
-  {% elif field.type == 'BigInt' %}
-    writer.writeU64({{ field.name }})
-  {% elif field.type == 'String' %}
-    writer.writeString({{ field.name }})
-  {% elif field.type == 'Uint8List' %}
-    writer.writeFixedArray({{ field.name }})
-{% elif field.type == 'Ed25519HDPublicKey' %}
-  writer.writeFixedArray(Uint8List.fromList({{ field.name }}.bytes))
+{# Reader for the base types (no nesting) #}
+{% macro baseTypeReader(baseType, isStruct) %}
+  {% if baseType == 'int' %}
+    reader.readU8()
+  {% elif baseType == 'BigInt' %}
+    reader.readU64()
+  {% elif baseType == 'String' %}
+    reader.readString()
+  {% elif baseType == 'Uint8List' %}
+    reader.readFixedU8Array({{ field.size or 8}})
+  {% elif baseType == 'Int8List' %}
+    reader.readFixedI8Array({{ field.size or 8}})
+  {% elif baseType == 'Uint16List' %}
+    reader.readFixedU16Array({{ field.size or 16 }})
+  {% elif baseType == 'Int16List' %}
+    reader.readFixedI16Array({{ field.size or 16}})
+  {% elif baseType == 'Uint32List' %}
+    reader.readFixedU32Array({{ field.size or 32}})
+  {% elif baseType == 'Int32List' %}
+    reader.readFixedI32Array({{ field.size or 32}})
+  {% elif baseType == 'Uint64List' %}
+    reader.readFixedU64Array({{ field.size or 64}})
+  {% elif baseType == 'Int64List' %}
+    reader.readFixedI64Array({{ field.size or 64 }})
+  {% elif baseType == 'bool' %}
+    reader.readBool()
+  {% elif baseType == 'Ed25519HDPublicKey' %}
+    Ed25519HDPublicKey(Uint8List.fromList(reader.readFixedU8Array(32)))
   {% else %}
-    writer.writeUnknownType('{{ field.type }}')
+    reader.readUnknownType('{{ baseType }}')
+  {% endif %}
+{% endmacro %}
+
+{# Recursive Borsh Writer, responsible to handle nested type of collections  #}
+{% macro borshWriter(field) %}
+  {{ recursiveWriter(field.name, field.nesting, field.baseType, field.isStruct) }}
+{% endmacro %}
+
+{% macro recursiveWriter(varName, depth, baseType, isStruct) %}
+  {% if depth == 0 %}
+    {% if isStruct %}
+      {{ varName }}.toBorsh(writer);
+    {% else %}
+    {# TODO: I have problem here because of these recursions i put ';' twice because twice is iterated here first trough writeArray and on the recursion i go inside here and i put ';' again #}
+      {{ baseTypeWriter(baseType, varName) }};
+    {% endif %}
+  {% else %}
+    writer.writeArray<{{ baseType }}>({{ varName }}, ({{ baseType }} item) {
+      {% if isStruct %}
+        // Each item is a struct
+        item.toBorsh(writer);
+      {% else %}
+        {{ recursiveWriter("item", depth - 1, baseType, false) }};
+      {% endif %}
+    });
+  {% endif %}
+{% endmacro %}
+
+
+
+{# Base Writer, no nested types inside #}
+{% macro baseTypeWriter(baseType, varName, isStruct) %}
+  {% if baseType == 'int' %}
+    writer.writeU8({{ varName }})
+  {% elif baseType == 'BigInt' %}
+    writer.writeU64({{ varName }})
+  {% elif baseType == 'String' %}
+    writer.writeString({{ varName }})
+  {% elif baseType == 'Uint8List' %}
+    writer.writeFixedU8Array({{ varName }})
+  {% elif baseType == 'Int8List' %}
+    writer.writeFixedI8Array({{ varName }})
+  {% elif baseType == 'Uint16List' %}
+    writer.writeFixedU16Array({{ varName }})
+  {% elif baseType == 'Int16List' %}
+    writer.writeFixedI16Array({{ varName }})
+  {% elif baseType == 'Uint32List' %}
+    writer.writeFixedU32Array({{ varName }})
+  {% elif baseType == 'Int32List' %}
+    writer.writeFixedI32Array({{ varName }})
+  {% elif baseType == 'Uint64List' %}
+    writer.writeFixedU64Array({{ varName }})
+  {% elif baseType == 'Int64List' %}
+    writer.writeFixedI64Array({{ varName }})
+  {% elif baseType == 'bool' %}
+    writer.writeBool({{ varName }})
+  {% elif baseType == 'Ed25519HDPublicKey' %}
+    writer.writeFixedU8Array(Uint8List.fromList({{ varName }}.bytes))
+  {% else %}
+    writer.writeUnknownType('{{ baseType }}')
   {% endif %}
 {% endmacro %}
