@@ -35,7 +35,7 @@ class {{ account.name | pascalCase }} {
 static {{ account.name | pascalCase }} fromBorsh(BinaryReader reader) {
   return {{ account.name | pascalCase }}(
     {% for field in fields %}
-      {{ field.name }}: {{ macros.borshReader(field) }},
+        {{ field.name }}: {{ macros.borshReader(field) }},
     {% endfor %}
   );
 }
@@ -43,10 +43,20 @@ static {{ account.name | pascalCase }} fromBorsh(BinaryReader reader) {
 
 /// Serializes this account to borsh.
 void toBorsh(BinaryWriter writer) {
-{% for field in fields %}
-      {{ macros.borshWriter(field) }};
-{% endfor %}
+  {% for field in fields %}
+    {% if '?' in field.field %}
+      // Optional field
+      writer.writeU8({{ field.name }} != null ? 1 : 0);
+      if ({{ field.name }} != null) {
+        {{ macros.borshWriter(field) | replace(field.name, field.name ~ '!') }}
+      }
+    {% else %}
+      // Non-optional field
+      {{ macros.borshWriter(field) }}
+    {% endif %}
+  {% endfor %}
 }
+
   /// Creates a [{{ account.name | pascalCase }}] from its bytes representation.
   static {{ account.name | pascalCase }} fromBytes(Uint8List data) {
     final buffer = ByteData.view(data.buffer);
@@ -54,7 +64,7 @@ void toBorsh(BinaryWriter writer) {
 
   {% if account.discriminator %}
   // Validate the discriminator
-  final discriminator = reader.readFixedArray(8);
+  final discriminator = reader.readFixedU8Array(8);
   if (!const ListEquality().equals(discriminator, {{ account.name | snakeCase | upper }}_DISCRIMINATOR)) {
     throw FormatException('Invalid account discriminator');
   }
@@ -69,7 +79,7 @@ void toBorsh(BinaryWriter writer) {
 
   {% if account.discriminator %}
   // Write discriminator
-  writer.writeFixedArray(Uint8List.fromList({{ account.name | snakeCase | upper }}_DISCRIMINATOR));
+  writer.writeFixedU8Array(Uint8List.fromList({{ account.name | snakeCase | upper }}_DISCRIMINATOR));
   {% endif %}
 
     // Write account data

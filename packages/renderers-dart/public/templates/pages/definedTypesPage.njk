@@ -15,6 +15,7 @@
 
 {% if definedType.kind === 'enumTypeNode' %}
 /// Extension providing serialization methods for {{ definedType.name | pascalCase }}.
+///
 extension {{ definedType.name | pascalCase }}Borsh on {{ definedType.name | pascalCase }} {
   /// Converts the enum to a byte representation.
   void toBorsh(BinaryWriter writer) {
@@ -65,21 +66,25 @@ extension {{ definedType.name | pascalCase }}Borsh on {{ definedType.name | pasc
     }
   }
 }
-{% elif definedType.kind === 'structTypeNode' %}
+
+{% elif definedType.type.kind === 'structTypeNode' %}
 /// Extension providing serialization methods for {{ definedType.name | pascalCase }}.
+///
 extension {{ definedType.name | pascalCase }}Borsh on {{ definedType.name | pascalCase }} {
   /// Serializes the struct to its byte representation.
   void toBorsh(BinaryWriter writer) {
-    {% for field in definedType.fields %}
-    {% if field.resolvedType.kind === 'numberTypeNode' %}
-    writer.writeU{{ field.resolvedType.format | replace('u', '') }}({{ field.name | camelCase }});
-    {% elif field.resolvedType.kind === 'stringTypeNode' %}
+    {% for field in definedType.type.fields %}
+    {% if field.type.kind === 'numberTypeNode' %}
+    writer.writeU{{ field.type.format | replace('u', '') }}({{ field.name | camelCase }});
+    {% elif field.type.kind === 'stringTypeNode' %}
     writer.writeString({{ field.name | camelCase }});
-    {% elif field.resolvedType.kind === 'booleanTypeNode' %}
+    {% elif field.type.kind === 'sizePrefixTypeNode' and field.type.type.kind === 'stringTypeNode' %}
+    writer.writeString({{ field.name | camelCase }});
+    {% elif field.type.kind === 'booleanTypeNode' %}
     writer.writeBool({{ field.name | camelCase }});
-    {% elif field.resolvedType.kind === 'publicKeyTypeNode' %}
-    writer.writeFixedArray({{ field.name | camelCase }}.toBytes());
-    {% elif field.resolvedType.kind === 'bytesTypeNode' %}
+    {% elif field.type.kind === 'publicKeyTypeNode' %}
+    writer.writeFixedU8Array({{ field.name | camelCase }}.toBytes());
+    {% elif field.type.kind === 'bytesTypeNode' %}
     writer.writeBytes({{ field.name | camelCase }});
     {% else %}
     {{ field.name | camelCase }}.toBorsh(writer);
@@ -90,24 +95,27 @@ extension {{ definedType.name | pascalCase }}Borsh on {{ definedType.name | pasc
   /// Creates a struct from its byte representation.
   static {{ definedType.name | pascalCase }} fromBorsh(BinaryReader reader) {
     return {{ definedType.name | pascalCase }}(
-      {% for field in definedType.fields %}
-      {% if field.resolvedType.kind === 'numberTypeNode' %}
-      {{ field.name | camelCase }}: reader.readU{{ field.resolvedType.format | replace('u', '') }}(),
-      {% elif field.resolvedType.kind === 'stringTypeNode' %}
+      {% for field in definedType.type.fields %}
+      {% if field.type.kind === 'numberTypeNode' %}
+      {{ field.name | camelCase }}: reader.readU{{ field.type.format | replace('u', '') }}(),
+      {% elif field.type.kind === 'stringTypeNode' %}
       {{ field.name | camelCase }}: reader.readString(),
-      {% elif field.resolvedType.kind === 'booleanTypeNode' %}
+      {% elif field.type.kind === 'sizePrefixTypeNode' and field.type.type.kind === 'stringTypeNode' %}
+      {{ field.name | camelCase }}: reader.readString(),
+      {% elif field.type.kind === 'booleanTypeNode' %}
       {{ field.name | camelCase }}: reader.readBool(),
-      {% elif field.resolvedType.kind === 'publicKeyTypeNode' %}
-      {{ field.name | camelCase }}: PublicKey.fromBytes(reader.readFixedArray(32)),
-      {% elif field.resolvedType.kind === 'bytesTypeNode' %}
+      {% elif field.type.kind === 'publicKeyTypeNode' %}
+      {{ field.name | camelCase }}: PublicKey.fromBytes(reader.readFixedU32Array(32)),
+      {% elif field.type.kind === 'bytesTypeNode' %}
       {{ field.name | camelCase }}: reader.readBytes(),
       {% else %}
-      {{ field.name | camelCase }}: {{ field.resolvedType.type }}.fromBorsh(reader),
+      {{ field.name | camelCase }}: {{ field.type.type }}.fromBorsh(reader),
       {% endif %}
       {% endfor %}
     );
   }
 }
+
 {% endif %}
 
 {% for nestedStruct in typeManifest.nestedStructs %}
