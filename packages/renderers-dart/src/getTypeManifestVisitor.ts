@@ -1,38 +1,38 @@
 import {
+    AccountNode,
     ArrayTypeNode,
+    BooleanTypeNode,
+    DefinedTypeLinkNode,
+    DefinedTypeNode,
+    EnumEmptyVariantTypeNode,
+    EnumStructVariantTypeNode,
+    EnumTupleVariantTypeNode,
+    EnumTypeNode,
+    FixedSizeTypeNode,
+    InstructionNode,
     isNode,
+    MapTypeNode,
+    NumberTypeNode,
+    OptionTypeNode,
     parseDocs,
     pascalCase,
     REGISTERED_TYPE_NODE_KINDS,
     REGISTERED_VALUE_NODE_KINDS,
+    SetTypeNode,
+    SizePrefixTypeNode,
     snakeCase,
+    StructFieldTypeNode,
+    StructTypeNode,
     structTypeNodeFromInstructionArgumentNodes,
+    TupleTypeNode,
 } from '@codama/nodes';
-import { extendVisitor, mergeVisitor, pipe, visit } from '@codama/visitors-core';
+import { extendVisitor, mergeVisitor, pipe, visit, Visitor } from '@codama/visitors-core';
 
 import { getDartTypedArrayType } from './fragments/dartTypedArray';
 import { ImportMap } from './ImportMap';
+import TypeManifest, { TypeManifestOptions } from './TypeManifest';
 import { dartDocblock } from './utils';
 
-type TypeManifest = {
-    imports: ImportMap;
-    nestedStructs: string[];
-    type: string;
-};
-
-export default TypeManifest;
-
-export type GetImportFromFunction = (node: any) => string;
-
-export type TypeManifestOptions = {
-    getImportFrom: GetImportFromFunction;
-    nestedStruct?: boolean;
-    parentName?: string | null;
-};
-
-export const structManifestMap: Record<string, TypeManifest> = {
-
-};
 
 export function getTypeManifestVisitor(options: TypeManifestOptions) {
     const { getImportFrom } = options;
@@ -43,10 +43,10 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
     return pipe(
         mergeVisitor(
             (): TypeManifest => ({ imports: new ImportMap(), nestedStructs: [], type: '' }),
-            (_: any, values: any[]) => ({
-                imports: new ImportMap().mergeWith(...values.map((v: any) => v.imports)),
-                nestedStructs: values.flatMap((v: any) => v.nestedStructs),
-                type: values.map((v: any) => v.type).join('\n'),
+            (_: unknown, values: TypeManifest[]) => ({
+                imports: new ImportMap().mergeWith(...values.map((v) => v.imports)),
+                nestedStructs: values.flatMap((v) => v.nestedStructs),
+                type: values.map((v) => v.type).join('\n'),
             }),
             {
                 keys: [
@@ -58,32 +58,30 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
                     'instructionNode',
                 ],
             }
-        ),
-        (v: any) =>
+        ) as Visitor<TypeManifest>,
+
+        (v: Visitor<TypeManifest>) =>
             extendVisitor(v, {
-                visitAccount(account: any, { self }: { self: any }): TypeManifest {
+                visitAccount(account: AccountNode, { self }: { self: Visitor<TypeManifest> }): TypeManifest {
                     parentName = pascalCase(account.name);
-                    const manifest = visit(account.data, self) as TypeManifest;
+                    const manifest = visit(account.data, self);
                     parentName = null;
                     return manifest;
                 },
 
-                visitArrayType(arrayType: ArrayTypeNode , { self }: { self: any}): TypeManifest {
+                visitArrayType(arrayType: ArrayTypeNode , { self }: { self: Visitor<TypeManifest>}): TypeManifest {
                     /*
-                    ArrayTypeNode structure:
-                    https://github.com/codama-idl/codama/blob/main/packages/nodes/docs/typeNodes/ArrayTypeNode.md
+                        ArrayTypeNode structure:
+                        https://github.com/codama-idl/codama/blob/main/packages/nodes/docs/typeNodes/ArrayTypeNode.md
                     */
-                    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
-                    const childManifest = visit(arrayType.item, self) as TypeManifest; // Item
+                    const childManifest = visit(arrayType.item, self); // Item
                     
-                    // console.log('===========Array Type ', arrayType);
                     const typedArrayManifest = getDartTypedArrayType(arrayType.item, childManifest);
                     if (typedArrayManifest) {
                         if (isNode(arrayType.count, 'fixedCountNode')) {
                             // Fixed-size typed array handler
                             return {
                                 ...typedArrayManifest,
-                                // type: `${typedArrayManifest.type} /* length: ${arrayType.count.value} */`,
                                 type: `${typedArrayManifest.type}`,
                             };
                         }
@@ -96,7 +94,7 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
                     }
                 },
 
-                visitBooleanType(_booleanType: any): TypeManifest {
+                visitBooleanType(_booleanType: BooleanTypeNode): TypeManifest {
                     return {
                         imports: new ImportMap(),
                         nestedStructs: [],
@@ -112,56 +110,48 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
                     };
                 },
 
-                visitDefinedType(definedType: any, { self }: { self: any }): TypeManifest {
+                visitDefinedType(definedType: DefinedTypeNode, { self }: { self: Visitor<TypeManifest> }): TypeManifest {
                     parentName = pascalCase(definedType.name);
-                    const manifest = visit(definedType.type, self) as TypeManifest;
+                    const manifest = visit(definedType.type, self);
                     parentName = null;
 
                     const renderedType = isNode(definedType.type, ['enumTypeNode', 'structTypeNode'])
                         ? manifest.type
                         : `typedef ${pascalCase(definedType.name)} = ${manifest.type};`;
                     
-                    // console.log('Defined type: ', definedType.type);
-                    // console.log('Defined type name: ', definedType.name);
-                    // console.log('Rendered type: ', renderedType);
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment 
                     return { ...manifest, type: renderedType};
                 },
 
-                visitDefinedTypeLink(node: any): TypeManifest {
+                visitDefinedTypeLink(node: DefinedTypeLinkNode): TypeManifest {
                     const snake_case = snakeCase(node.name); // This is the correct way to name files in Dart
                     const pascal_case = pascalCase(node.name); // This is the correct way to name types in Dart
                     // Example: types/simple_struct.dart -> SimpleStruct (is the actual type name)
                     const importFrom = getImportFrom(node);
 
-                    // TODO: I have decided to change this because it's not correct path to the types file and `::` is not valid in Dart imports
-                    // and in my case i have to use snake_case instead of pascalCase and append `.dart` extension and ../ because types are in parent folder
-                    
                     return {
                         imports: new ImportMap().add(`../${importFrom}/${snake_case}.dart`, [snake_case]),
-                        type: pascal_case,
                         nestedStructs: [],
+                        type: pascal_case,
                     };
                 },
 
-                visitEnumEmptyVariantType(enumEmptyVariantType: any) {
+                visitEnumEmptyVariantType(enumEmptyVariantType: EnumEmptyVariantTypeNode): TypeManifest {
                     const name = pascalCase(enumEmptyVariantType.name);
                     return {
                         imports: new ImportMap(),
                         nestedStructs: [],
-                        // type: `${name},`,
                         type: `class ${name} extends ${parentName} {}`
                     };
                 },
 
-                visitEnumStructVariantType(enumStructVariantType: any, { self }: { self: any }) {
+                visitEnumStructVariantType(enumStructVariantType: EnumStructVariantTypeNode, { self }: { self: Visitor<TypeManifest> }): TypeManifest {
                     const name = pascalCase(enumStructVariantType.name);
                     const originalParentName = parentName;
                     
                     inlineStruct = true;
                     // Sets the name of the parent to the variant name only
                     parentName = name;
-                    const typeManifest = visit(enumStructVariantType.struct, self) as TypeManifest;
+                    const typeManifest = visit(enumStructVariantType.struct, self);
                     inlineStruct = false;
                     // Set the Parent name back to the original parent name(Enum class name)
                     parentName = originalParentName;
@@ -173,18 +163,15 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
                     };
                 },
 
-                visitEnumTupleVariantType(enumTupleVariantType: any, { self }: { self: any }) {
+                visitEnumTupleVariantType(enumTupleVariantType: EnumTupleVariantTypeNode, { self }: { self: Visitor<TypeManifest> }): TypeManifest {
                     const name = pascalCase(enumTupleVariantType.name);
                     const originalParentName = parentName;
-
                     // Use a default name if no parent name is available
                     const variantParentName = originalParentName || 'AnonymousEnum';
 
                     parentName = pascalCase(variantParentName) + name;
-                    const childManifest = visit(enumTupleVariantType.tuple, self) as TypeManifest;
+                    const childManifest = visit(enumTupleVariantType.tuple, self);
                     parentName = originalParentName;
-
-                    console.log('Tuple enum type child manifest: ', childManifest.type);
 
                     const tupleTypes = childManifest.type.replace(/[()]/g, '').split(',').map(s => s.trim());
                     const fields = tupleTypes.map((type, i) => `final ${type} value${i};`).join('\n');
@@ -192,7 +179,6 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
 
                     return {
                         ...childManifest,
-                        // type: `${name}${childManifest.type},`,
                         type: `class ${name} extends ${parentName} {
                             ${fields}
 
@@ -201,18 +187,18 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
                     };
                 },
 
-                visitEnumType(enumType: any, { self }: { self: any }) {
+                visitEnumType(enumType: EnumTypeNode, { self }: { self: Visitor<TypeManifest> }): TypeManifest {
                     const originalParentName = parentName;
                     // Use a default name if no parent name is available
                     const enumName = originalParentName || 'AnonymousEnum';
 
-                    const variants = enumType.variants.map((variant: any) => visit(variant, self) as TypeManifest);
+                    const variants = enumType.variants.map((variant) => visit(variant, self));
 
-                    const variantNames = variants.map((variant: any) => variant.type).join('\n');
+                    const variantNames = variants.map((variant) => variant.type).join('\n');
 
                     const mergedManifest = {
-                        imports: new ImportMap().mergeWith(...variants.map((v: any) => v.imports)),
-                        nestedStructs: variants.flatMap((v: any) => v.nestedStructs),
+                        imports: new ImportMap().mergeWith(...variants.map((v) => v.imports)),
+                        nestedStructs: variants.flatMap((v) => v.nestedStructs),
                     };
 
                     return {
@@ -222,23 +208,23 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
                     };
                 },
 
-                visitFixedSizeType(fixedSizeType: any, { self }: { self: any }) {
-                    const manifest = visit(fixedSizeType.type, self) as TypeManifest;
+                visitFixedSizeType(fixedSizeType: FixedSizeTypeNode, { self }: { self: Visitor<TypeManifest> }): TypeManifest {
+                    const manifest = visit(fixedSizeType.type, self);
                     return manifest;
                 },
 
-                visitInstruction(instruction: any, { self }: { self: any }) {
+                visitInstruction(instruction: InstructionNode, { self }: { self: Visitor<TypeManifest> }): TypeManifest {
                     const originalParentName = parentName;
                     parentName = pascalCase(instruction.name);
                     const struct = structTypeNodeFromInstructionArgumentNodes(instruction.arguments);
-                    const manifest = visit(struct, self) as TypeManifest;
+                    const manifest = visit(struct, self);
                     parentName = originalParentName;
                     return manifest;
                 },
 
-                visitMapType(mapType: any, { self }: { self: any }) {
-                    const key = visit(mapType.key, self) as TypeManifest;
-                    const value = visit(mapType.value, self) as TypeManifest;
+                visitMapType(mapType: MapTypeNode, { self }: { self: Visitor<TypeManifest> }): TypeManifest {
+                    const key = visit(mapType.key, self);
+                    const value = visit(mapType.value, self);
                     const mergedManifest = {
                         imports: new ImportMap().mergeWith(key.imports, value.imports),
                         nestedStructs: [...key.nestedStructs, ...value.nestedStructs],
@@ -249,7 +235,7 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
                     };
                 },
 
-                visitNumberType(numberType: any) {
+                visitNumberType(numberType: NumberTypeNode): TypeManifest {
                     switch (numberType.format) {
                         case 'u8':
                         case 'u16':
@@ -282,8 +268,8 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
                     }
                 },
 
-                visitOptionType(optionType: any, { self }: { self: any }) {
-                    const childManifest = visit(optionType.item, self) as TypeManifest;
+                visitOptionType(optionType: OptionTypeNode, { self }: { self: Visitor<TypeManifest> }): TypeManifest {
+                    const childManifest = visit(optionType.item, self);
 
                     return {
                         ...childManifest,
@@ -299,16 +285,16 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
                     };
                 },
 
-                visitSetType(setType: any, { self }: { self: any }) {
-                    const childManifest = visit(setType.item, self) as TypeManifest;
+                visitSetType(setType: SetTypeNode, { self }: { self: Visitor<TypeManifest> }): TypeManifest {
+                    const childManifest = visit(setType.item, self);
                     return {
                         ...childManifest,
                         type: `Set<${childManifest.type}>`,
                     };
                 },
 
-                visitSizePrefixType(sizePrefixType: any, { self }: { self: any }) {
-                    const manifest = visit(sizePrefixType.type, self) as TypeManifest;
+                visitSizePrefixType(sizePrefixType: SizePrefixTypeNode, { self }: { self: Visitor<TypeManifest> }): TypeManifest {
+                    const manifest = visit(sizePrefixType.type, self);
                     return manifest;
                 },
 
@@ -321,7 +307,7 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
                     };
                 },
 
-                visitStructFieldType(structFieldType: any, { self }: { self: any }) {
+                visitStructFieldType(structFieldType: StructFieldTypeNode, { self }: { self: Visitor<TypeManifest> }): TypeManifest {
                     const originalParentName = parentName;
                     const originalInlineStruct = inlineStruct;
                     const originalNestedStruct = nestedStruct;
@@ -331,7 +317,7 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
                     nestedStruct = true;
                     inlineStruct = false;
 
-                    const fieldManifest = visit(structFieldType.type, self) as TypeManifest;
+                    const fieldManifest = visit(structFieldType.type, self);
 
                     parentName = originalParentName;
                     inlineStruct = originalInlineStruct;
@@ -349,23 +335,23 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
                     };
                 },
 
-                visitStructType(structType: any, { self }: { self: any }) {
+                visitStructType(structType: StructTypeNode, { self }: { self: Visitor<TypeManifest> }) {
                     const originalParentName = parentName;
                     // Use a default name if no parent name is available
                     const structName = originalParentName || 'AnonymousStruct';
                     
                     // In Dart, every variable must be initialized, either via constructor or with a default value.
                     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-                    const classConstrutor = `  ${pascalCase(structName)}({\n${structType.fields.map((field: any) => `    required this.${snakeCase(field.name)},`).join('\n')}\n  });\n`;
+                    const classConstrutor = `  ${pascalCase(structName)}({\n${structType.fields.map((field) => `    required this.${snakeCase(field.name)},`).join('\n')}\n  });\n`;
 
                     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                    const fields = structType.fields.map((field: any) =>
-                        visit(field, self) as TypeManifest
+                    const fields = structType.fields.map((field) =>
+                        visit(field, self)
                     );
-                    const fieldTypes = fields.map((field: any) => field.field).join('\n');
+                    const fieldTypes = fields.map((field) => field.field).join('\n');
                     const mergedManifest = {
-                        imports: new ImportMap().mergeWith(...fields.map((f: any) => f.imports)),
-                        nestedStructs: fields.flatMap((f: any) => f.nestedStructs),
+                        imports: new ImportMap().mergeWith(...fields.map((f) => f.imports)),
+                        nestedStructs: fields.flatMap((f) => f.nestedStructs),
                     };
 
                     if (nestedStruct) {
@@ -404,21 +390,22 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
                     };
                 },
 
-                visitTupleType(tupleType: any, { self }: { self: any }) {
-                    const items = tupleType.items.map((item: any) =>
-                        visit(item, self) as TypeManifest
+                visitTupleType(tupleType: TupleTypeNode, { self }: { self: Visitor<TypeManifest> }): TypeManifest {
+                    const items = tupleType.items.map((item) =>
+                        visit(item, self)
                     );
                     const mergedManifest = {
-                        imports: new ImportMap().mergeWith(...items.map((f: any) => f.imports)),
-                        nestedStructs: items.flatMap((f: any) => f.nestedStructs),
+                        imports: new ImportMap().mergeWith(...items.map((f) => f.imports)),
+                        nestedStructs: items.flatMap((f) => f.nestedStructs),
                     };
                     return {
                         ...mergedManifest,
-                        type: `(${items.map((item: any) => item.type).join(', ')})`,
+                        type: `(${items.map((item) => item.type).join(', ')})`,
                     };
                 },
 
-                visitDateTimeType() {
+                // eslint-disable-next-line sort-keys-fix/sort-keys-fix
+                visitDateTimeType(): TypeManifest {
                     return {
                         imports: new ImportMap(),
                         nestedStructs: [],

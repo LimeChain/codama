@@ -43,7 +43,6 @@ export function getImportFromFactory(overrides: LinkOverrides): GetImportFromFun
             case 'accountLinkNode':
                 return linkOverrides.accounts[node.name] ?? (fallback ?? 'generated_accounts');
             case 'definedTypeLinkNode':
-                // TODO: I manually changed here to return 'types' instead of `generated_types` because folder like that doesn't exist
                 return linkOverrides.definedTypes[node.name] ?? (fallback ?? 'types');
             case 'instructionLinkNode':
                 return linkOverrides.instructions[node.name] ?? (fallback ?? 'generated_instructions');

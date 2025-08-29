@@ -1,7 +1,7 @@
 import { pascalCase, TypeNode } from '@codama/nodes';
 
-import TypeManifest from '../getTypeManifestVisitor';
 import { ImportMap} from '../ImportMap';
+import TypeManifest from '../TypeManifest';
 /**
  * Utility for mapping Rust number formats to Dart typed array types.
  * 
@@ -21,7 +21,7 @@ const numberFormatToDartType: Record<string, string> = {
     u8: 'Uint8List',
 };
 
-export function getDartTypedArrayType(item: TypeNode, childManifest: TypeManifest) {
+export function getDartTypedArrayType(item: TypeNode, childManifest: TypeManifest): TypeManifest {
     
     // Handle string arrays
     if (item?.kind === 'sizePrefixTypeNode' && item.type?.kind === 'stringTypeNode') {

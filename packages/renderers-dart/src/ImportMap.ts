@@ -1,4 +1,4 @@
-import TypeManifest from './getTypeManifestVisitor';
+import TypeManifest from "./TypeManifest";
 
 const DEFAULT_DART_CORE_LIBRARIES: Record<string, string> = {
     dartAsync: 'dart:async',
@@ -23,7 +23,7 @@ const DEFAULT_INTERNAL_MODULE_MAP: Record<string, string> = {
 export class ImportMap {
     protected readonly _imports: Map<string, Set<string>> = new Map();
     protected readonly _prefixes: Map<string, string> = new Map();
-    protected readonly _showHide: Map<string, { show?: string[], hide?: string[] }> = new Map();
+    protected readonly _showHide: Map<string, { hide?: string[], show?: string[] }> = new Map();
 
     add(module: string, imports: Set<string> | string[] | string): ImportMap {
         const newImports = new Set(typeof imports === 'string' ? [imports] : imports);

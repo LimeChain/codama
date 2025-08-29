@@ -1,5 +1,6 @@
-import { AccountNode, ConstantDiscriminatorNode, InstructionNode, isNode, resolveNestedTypeNode } from "@codama/nodes";
 import { createHash } from "node:crypto";
+
+import { AccountNode, ConstantDiscriminatorNode, DiscriminatorNode, InstructionNode, isNode, resolveNestedTypeNode } from "@codama/nodes";
 
 export function extractDiscriminatorBytes(node: AccountNode | InstructionNode): number[] {
     const constant = extractConstantDiscriminatorBytes(node.discriminators);
@@ -34,9 +35,9 @@ export function extractDiscriminatorBytes(node: AccountNode | InstructionNode): 
     return [];
 }
 
-function extractConstantDiscriminatorBytes(discriminators?: ConstantDiscriminatorNode[] | any[]): number[] {
+function extractConstantDiscriminatorBytes(discriminators?: ConstantDiscriminatorNode[] | DiscriminatorNode[]): number[] {
     const d = (discriminators ?? []).find(
-        (x: any): x is ConstantDiscriminatorNode => x?.kind === 'constantDiscriminatorNode',
+        (x: DiscriminatorNode): x is ConstantDiscriminatorNode => x?.kind === 'constantDiscriminatorNode',
     );
     if (!d) return [];
 
@@ -57,7 +58,7 @@ function extractConstantDiscriminatorBytes(discriminators?: ConstantDiscriminato
     return [];
 }
 
-function computeAnchorDiscriminator(prefix: 'global' | 'account', name: string): number[] {
+function computeAnchorDiscriminator(prefix: 'account' | 'global', name: string): number[] {
     const preimage = `${prefix}:${name}`;
     const hash = createHash('sha256').update(Buffer.from(preimage, 'utf8')).digest();
     return Array.from(hash.subarray(0, 8));

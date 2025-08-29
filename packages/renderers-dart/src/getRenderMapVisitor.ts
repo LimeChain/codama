@@ -1,11 +1,14 @@
 import {
+    AccountNode,
     camelCase,
+    DefinedTypeNode,
     getAllAccounts,
     getAllDefinedTypes,
     getAllInstructionsWithSubs,
     getAllPdas,
     getAllPrograms,
     pascalCase,
+    PdaNode,
     resolveNestedTypeNode,
     snakeCase,
     structTypeNodeFromInstructionArgumentNodes,
@@ -25,9 +28,11 @@ import {
 } from '@codama/visitors-core';
 import { join } from 'path';
 
-import TypeManifest, { getTypeManifestVisitor } from './getTypeManifestVisitor';
+import { getTypeManifestVisitor } from './getTypeManifestVisitor';
 import { ImportMap } from './ImportMap';
+import TypeManifest, { extractFieldsFromTypeManifest } from './TypeManifest';
 import { extractDiscriminatorBytes, getImportFromFactory, LinkOverrides, render } from './utils';
+import getAllDefinedTypesInNode from './utils/getAllDefinedTypesInNode';
 
 
 export type GetRenderMapOptions = {
@@ -36,68 +41,11 @@ export type GetRenderMapOptions = {
     renderParentInstructions?: boolean;
 };
 
-// '  final Int64List i64_array;\n' +
-// '  final Int8List /* length: 2 */ fixed_i8;\n' +
-function extractFieldsFromTypeManifest(typeManifest: TypeManifest): { 
-    baseType: string 
-    field: string, 
-    name: string, 
-    nesting: number, 
-    type: string, 
-}[] {
-    return typeManifest.type
-        .split('\n')
-        .map((line) => {
-            // That handles lines like: final Uint8List fieldName; and extracts the type and name in order to be used from borsh readers/writers
-            const match = line.trim().match(/^final\s+([\w<>, ?]+)\s+(\w+);$/);
-            if (match && match[2] !== 'discriminator') {
-                const isOptional = /\?$/.test(match[1]);
-                const rawType = match[1].replace(/\?$/, '').trim();
-
-                // Count nesting depth of List<>
-                let nesting = 0;
-                let inner = rawType;
-                const listRegex = /^List<(.+)>$/;
-
-                while (listRegex.test(inner)) {
-                    nesting += 1;
-                    inner = inner.replace(listRegex, '$1').trim();
-                }
-
-                return {
-                    baseType: inner,
-                    field: line,
-                    name: match[2],
-                    nesting,
-                    optional: isOptional, 
-                    type: match[1].replace(/\?$/, ''),
-                };
-            }
-            return null;
-        })
-        .filter((entry): entry is { 
-            baseType: string;
-            field: string;
-            name: string; 
-            nesting: number;
-            optional: boolean;
-            type: string; 
-        } => entry !== null);
-}
 
 // Given a type like List<SomeStruct> or Option<SomeStruct> or Set<SomeStruct>, it returns SomeStruct
 function getBaseType(type: string): string {
     const match = type.match(/^(?:List|Set|Option)<([\w\d_]+)>$/);
     return match ? match[1] : type;
-}
-
-/**
- * Returns a set of all struct type names defined in the given program node.
- * Used for distinguishing user-defined struct types during code generation.
- */
-function getAllDefinedTypesInNode(programNode: any): Set<string> {
-  if (!programNode) return new Set();
-  return new Set(getAllDefinedTypes(programNode).map(typeNode => pascalCase(typeNode.name)));
 }
 
 export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<RenderMap,
@@ -129,7 +77,7 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
         (v) =>
             extendVisitor(v, {
                 visitAccount(node) {
-                    const typeManifest = visit(node, typeManifestVisitor) as TypeManifest;
+                    const typeManifest: TypeManifest = visit(node, typeManifestVisitor);
                     const { imports } = typeManifest;
                     
                     imports.add('dartTypedData', new Set(['Uint8List', 'ByteData']));
@@ -166,7 +114,7 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                 },
 
                 visitDefinedType(node) {
-                    const typeManifest = visit(node, typeManifestVisitor) as TypeManifest;
+                    const typeManifest = visit(node, typeManifestVisitor);
                     const imports = new ImportMap().mergeWithManifest(typeManifest);
 
                     imports.add('../shared.dart', new Set(['BinaryReader', 'BinaryWriter', 'AccountNotFoundError']));
@@ -202,7 +150,7 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
 
                     const imports = new ImportMap();
                     const struct = structTypeNodeFromInstructionArgumentNodes(node.arguments);
-                    const typeManifest = visit(struct, typeManifestVisitor) as TypeManifest;
+                    const typeManifest = visit(struct, typeManifestVisitor);
                     imports.mergeWith(typeManifest.imports);
 
                     imports
@@ -224,7 +172,8 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                                 getImportFrom,
                                 nestedStruct: true,
                                 parentName: `${pascalCase(node.name)}InstructionArgs`,
-                            })) as TypeManifest;
+                            }));
+
                             imports.mergeWith(argManifest.imports);
                             const rt = resolveNestedTypeNode(a.type);
                             return {
@@ -262,13 +211,13 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
 
                 visitProgram(node, { self }) {
                     const renderMap = new RenderMap()
-                        .mergeWith(...(node.pdas ?? []).map((p: any) => visit(p, self)))
-                        .mergeWith(...node.accounts.map((account: any) => visit(account, self)))
-                        .mergeWith(...node.definedTypes.map((type: any) => visit(type, self)))
+                        .mergeWith(...(node.pdas ?? []).map((p: PdaNode) => visit(p, self)))
+                        .mergeWith(...node.accounts.map((account: AccountNode) => visit(account, self)))
+                        .mergeWith(...node.definedTypes.map((type: DefinedTypeNode) => visit(type, self)))
                         .mergeWith(
                             ...getAllInstructionsWithSubs(node, {
                                 leavesOnly: !renderParentInstructions,
-                            }).map((ix: any) => visit(ix, self)),
+                            }).map((ix) => visit(ix, self)),
                         );
 
                     if (node.errors.length > 0) {
@@ -343,7 +292,7 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
 
                     return map
                         .add('lib.dart', renderTemplate('rootMod.njk', ctx))
-                        .mergeWith(...getAllPrograms(node).map((p: any) => visit(p, self)));
+                        .mergeWith(...getAllPrograms(node).map((p) => visit(p, self)));
                 },
             }),
         (v) => recordNodeStackVisitor(v, stack),
