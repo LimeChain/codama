@@ -36,9 +36,8 @@
   {% endif %}
 {% endmacro %}
 
-
 {# Recursive Borsh Reader, responsible for handling collections and any nested levels #}
-{% macro borshReader(field) %}
+{% macro borshReader(field) %}  
   {{ recursiveReader(field.nesting, field.baseType, field.isStruct) }}
 {% endmacro %}
 
@@ -64,9 +63,9 @@
 {# Reader for the base types (no nesting) #}
 {% macro baseTypeReader(baseType, isStruct) %}
   {% if baseType == 'int' %}
-    reader.readU8()
+    reader.readInt()
   {% elif baseType == 'BigInt' %}
-    reader.readU64()
+    reader.readBigInt()
   {% elif baseType == 'String' %}
     reader.readString()
   {% elif baseType == 'Uint8List' %}
@@ -95,8 +94,9 @@
 {% endmacro %}
 
 {# Recursive Borsh Writer, responsible to handle nested type of collections  #}
-{% macro borshWriter(field) %}
-  {{ recursiveWriter(field.name, field.nesting, field.baseType, field.isStruct) }}
+{% macro borshWriter(field, overrideFieldName="") %}
+  {% set name = overrideFieldName if overrideFieldName else field.name %}
+  {{ recursiveWriter(name, field.nesting, field.baseType, field.isStruct) }}
 {% endmacro %}
 
 {% macro recursiveWriter(varName, depth, baseType, isStruct) %}
@@ -119,14 +119,12 @@
   {% endif %}
 {% endmacro %}
 
-
-
 {# Base Writer, no nested types inside #}
 {% macro baseTypeWriter(baseType, varName, isStruct) %}
   {% if baseType == 'int' %}
-    writer.writeU8({{ varName }})
+    writer.writeInt({{ varName }})
   {% elif baseType == 'BigInt' %}
-    writer.writeU64({{ varName }})
+    writer.writeBigInt({{ varName }})
   {% elif baseType == 'String' %}
     writer.writeString({{ varName }})
   {% elif baseType == 'Uint8List' %}

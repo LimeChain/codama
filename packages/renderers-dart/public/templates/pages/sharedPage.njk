@@ -36,6 +36,25 @@ class BinaryReader {
     return value;
   }
 
+  /// Reads a int data type.
+  int readInt() {
+    final b0 = _data.getUint8(_offset);
+    final b1 = _data.getUint8(_offset + 1);
+    final b2 = _data.getUint8(_offset + 2);
+    final b3 = _data.getUint8(_offset + 3);
+    _offset += 4;
+    return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
+  }
+
+  BigInt readBigInt() {
+    BigInt result = BigInt.zero;
+    for (int i = 0; i < 16; i++) {
+      result |= BigInt.from(_data.getUint8(_offset + i)) << (8 * i);
+    }
+    _offset += 16;
+    return result;
+  }
+
   /// Reads an unsigned 8-bit integer.
   int readU8() {
     final value = _data.getUint8(_offset);
@@ -190,6 +209,21 @@ class BinaryWriter {
   /// Writes a boolean value.
   void writeBool(bool value) {
     _bytes.add(value ? 1 : 0);
+  }
+
+  void writeInt(int value) {
+    _bytes.addAll([
+      value & 0xFF,
+      (value >> 8) & 0xFF,
+      (value >> 16) & 0xFF,
+      (value >> 24) & 0xFF,
+    ]);
+  }
+
+  void writeBigInt(BigInt value) {
+    for (int i = 0; i < 16; i++) {
+      _bytes.add(((value >> (8 * i)) & BigInt.from(0xFF)).toInt());
+    }
   }
 
   /// Writes an unsigned 8-bit integer.

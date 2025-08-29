@@ -1,10 +1,10 @@
-import { TypeManifest } from './getTypeManifestVisitor';
+import TypeManifest from './getTypeManifestVisitor';
 
 const DEFAULT_DART_CORE_LIBRARIES: Record<string, string> = {
-    dartCore: 'dart:core',
     dartAsync: 'dart:async',
     dartCollection: 'dart:collection',
     dartConvert: 'dart:convert',
+    dartCore: 'dart:core',
     dartMath: 'dart:math',
     dartTypedData: 'dart:typed_data',
 };
