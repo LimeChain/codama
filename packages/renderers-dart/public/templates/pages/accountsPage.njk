@@ -67,7 +67,7 @@ void toBorsh(BinaryWriter writer) {
 
   {% if account.discriminator %}
   // Validate the discriminator
-  final discriminator = reader.readFixedU8Array(8);
+  final discriminator = reader.readDiscriminator();
   if (!const ListEquality().equals(discriminator, {{ account.name | snakeCase | upper }}_DISCRIMINATOR)) {
     throw FormatException('Invalid account discriminator');
   }
@@ -129,7 +129,11 @@ void toBorsh(BinaryWriter writer) {
     RpcClient client,
     Ed25519HDPublicKey address,
   ) async {
-    final accountInfo = await client.getAccountInfo(address.toBase58());
+    {# Always use encoding: Encoding.base64 when fetching account data. #}
+    {# Base58 is meant for public keys, not raw binary, and will produce the wrong bytes. #}
+    {# Base64 ensures we get the exact raw on-chain bytes (including the correct discriminator). #}
+
+    final accountInfo = await client.getAccountInfo(address.toBase58(), encoding: Encoding.base64);
     final data = accountInfo.value?.data;
 
     if (data == null) {

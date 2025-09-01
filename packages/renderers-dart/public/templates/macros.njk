@@ -69,26 +69,27 @@
   {% elif baseType == 'String' %}
     reader.readString()
   {% elif baseType == 'Uint8List' %}
-    reader.readFixedU8Array({{ field.size or 8}})
+    reader.readU8Array({{ field.size if field.size is defined else '' }})
   {% elif baseType == 'Int8List' %}
-    reader.readFixedI8Array({{ field.size or 8}})
+    reader.readI8Array({{ field.size if field.size is defined else '' }})
   {% elif baseType == 'Uint16List' %}
-    reader.readFixedU16Array({{ field.size or 16 }})
+    reader.readU16Array({{ field.size if field.size is defined else '' }})
   {% elif baseType == 'Int16List' %}
-    reader.readFixedI16Array({{ field.size or 16}})
+    reader.readI16Array({{ field.size if field.size is defined else '' }})
   {% elif baseType == 'Uint32List' %}
-    reader.readFixedU32Array({{ field.size or 32}})
+    reader.readU32Array({{ field.size if field.size is defined else '' }})
   {% elif baseType == 'Int32List' %}
-    reader.readFixedI32Array({{ field.size or 32}})
+    reader.readI16Array({{ field.size if field.size is defined else '' }})
   {% elif baseType == 'Uint64List' %}
-    reader.readFixedU64Array({{ field.size or 64}})
+    reader.readU64Array({{ field.size if field.size is defined else '' }})
   {% elif baseType == 'Int64List' %}
-    reader.readFixedI64Array({{ field.size or 64 }})
+    reader.readI16Array({{ field.size if field.size is defined else '' }})
   {% elif baseType == 'bool' %}
     reader.readBool()
   {% elif baseType == 'Ed25519HDPublicKey' %}
-    Ed25519HDPublicKey(Uint8List.fromList(reader.readFixedU8Array(32)))
+    Ed25519HDPublicKey(Uint8List.fromList(reader.readU8Array(32)))
   {% else %}
+    /// TODO: I need to provide panic or error guard to indicate that user is doing something that is not supported
     reader.readUnknownType('{{ baseType }}')
   {% endif %}
 {% endmacro %}
