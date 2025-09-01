@@ -91,10 +91,16 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                     const programNode = findProgramNodeFromPath(stack.getPath('accountNode'));
                     const structTypeNames = getAllDefinedTypesInNode(programNode);
 
-                    const fields = extractFieldsFromTypeManifest(typeManifest).map(field => ({
-                        ...field,
-                        isStruct: structTypeNames.has(getBaseType(field.type))
-                    }));
+                    const fields = extractFieldsFromTypeManifest(typeManifest).map(field => {
+                        const fieldCleaned = field.type.replace(/\?/g, '');
+                        const baseType = getBaseType(fieldCleaned); // Remove optional marker `?` for the check
+
+                        return {
+                            ...field,
+                            baseType: baseType,
+                            isStruct: structTypeNames.has(baseType)
+                        }
+                    });
 
                     return new RenderMap().add(
                         `accounts/${snakeCase(node.name)}.dart`,
@@ -125,10 +131,13 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                     const programNode = findProgramNodeFromPath(stack.getPath('definedTypeNode'));
                     const structTypeNames = getAllDefinedTypesInNode(programNode);
                         
-                    const fields = extractFieldsFromTypeManifest(typeManifest).map(field => ({
-                        ...field,
-                        isStruct: structTypeNames.has(getBaseType(field.type))
-                    }));
+                    const fields = extractFieldsFromTypeManifest(typeManifest).map(field => {
+                        const baseType = getBaseType(field.type).replace(/\?$/, ''); // Remove optional marker `?` for the check
+                        return {
+                            ...field,
+                            isStruct: structTypeNames.has(baseType)
+                        }
+                    });
 
                     return new RenderMap().add(
                         `types/${snakeCase(node.name)}.dart`,

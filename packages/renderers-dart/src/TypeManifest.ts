@@ -36,7 +36,7 @@ export function extractFieldsFromTypeManifest(typeManifest: TypeManifest): {
             // That handles lines like: final Uint8List fieldName; and extracts the type and name in order to be used from borsh readers/writers
             const match = line.trim().match(/^final\s+([\w<>, ?]+)\s+(\w+);$/);
             if (match && match[2] !== 'discriminator') {
-                const isOptional = /\?$/.test(match[1]);
+                const isOptional = /\?$/.test(match[1]); // check if the string ends with a '?'
                 const rawType = match[1].replace(/\?$/, '').trim();
 
                 // Count nesting depth of List<>
