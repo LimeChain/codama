@@ -79,11 +79,11 @@
   {% elif baseType == 'Uint32List' %}
     reader.readU32Array({{ field.size if field.size is defined else '' }})
   {% elif baseType == 'Int32List' %}
-    reader.readI16Array({{ field.size if field.size is defined else '' }})
+    reader.readI32Array({{ field.size if field.size is defined else '' }})
   {% elif baseType == 'Uint64List' %}
     reader.readU64Array({{ field.size if field.size is defined else '' }})
   {% elif baseType == 'Int64List' %}
-    reader.readI16Array({{ field.size if field.size is defined else '' }})
+    reader.readI64Array({{ field.size if field.size is defined else '' }})
   {% elif baseType == 'bool' %}
     reader.readBool()
   {% elif baseType == 'Ed25519HDPublicKey' %}
