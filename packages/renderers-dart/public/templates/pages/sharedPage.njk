@@ -223,10 +223,13 @@ class BinaryReader {
       _offset += 4;
     }
 
-    final bytes =
-        Uint64List.view(_data.buffer, _data.offsetInBytes + _offset, length);
-    _offset += length * 8;
-    return bytes;
+    final values = Uint64List(length);
+    for (int i = 0; i < length; i++) {
+      values[i] = _data.getUint64(_offset, Endian.little);
+      _offset += 8;
+    }
+
+    return values;
   }
 
   /// Reads a fixed-size i64 array of bytes.
@@ -237,10 +240,12 @@ class BinaryReader {
       _offset += 4;
     }
 
-    final bytes =
-        Int64List.view(_data.buffer, _data.offsetInBytes + _offset, length);
-    _offset += length * 8;
-    return bytes;
+    final values = Int64List(length);
+    for (int i = 0; i < length; i++) {
+      values[i] = _data.getInt64(_offset, Endian.little);
+      _offset += 8;
+    }
+    return values;
   }
 
   /// Reads a variable-length array of generic items.
