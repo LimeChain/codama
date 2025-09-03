@@ -289,7 +289,7 @@ class BinaryReader {
   }
 
   // ========= Utils for alignment-safe array reading ========
-  
+
   // This function handles the problem of buffer's offset that is not properly aligned for typed array views.
   // It happens because i have fixed-size and prefixed-size arrays.
   T readAlignedArray<T>(
@@ -566,6 +566,11 @@ class BinaryWriter {
     for (final item in items) {
       itemWriter(item);
     }
+  }
+
+  /// Writes a single public key (32 raw bytes, no prefix).
+  void writePubkey(Uint8List pubkeyBytes) {
+    _bytes.addAll(pubkeyBytes);
   }
 
   /// Returns the byte array.

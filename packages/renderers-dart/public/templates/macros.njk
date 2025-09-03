@@ -147,7 +147,7 @@
   {% elif baseType == 'bool' %}
     writer.writeBool({{ varName }})
   {% elif baseType == 'Ed25519HDPublicKey' %}
-    writer.writeU8Array(Uint8List.fromList({{ varName }}.bytes), null)
+    writer.writePubkey(Uint8List.fromList({{ varName }}.bytes))
   {% else %}
     writer.writeUnknownType('{{ baseType }}')
   {% endif %}
