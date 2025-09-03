@@ -1,124 +1,120 @@
 {% extends "layout.njk" %}
 {% import "macros.njk" as macros %}
 
+
+{% extends "layout.njk" %}
+{% import "macros.njk" as macros %}
+
 {% block main %}
   {{ imports }}
 
   {% if instruction.discriminator and instruction.discriminator.length > 0 -%}
-const List<int>
-      {{ instruction.name | snakeCase | upper }}_DISCRIMINATOR = [{{ instruction.discriminator | join(', ') }}];
-{%- endif %}
+    const List<int> {{ instruction.name | snakeCase | upper }}_DISCRIMINATOR = [{{ instruction.discriminator | join(', ') }}];
+  {%- endif %}
 
-/// Generated instruction class for {{ instruction.name | pascalCase }}.
-///
-{% if instruction.docs.length > 0 -%}
-      {%- for doc in instruction.docs -%}
-/// {{ doc }}
-      {%- endfor -%}
-    {%- endif %}
-class {{ instruction.name | pascalCase }}Instruction {
+  /// Generated instruction class for {{ instruction.name | pascalCase }}.
+  ///
+  {% if instruction.docs.length > 0 -%}
+    {%- for doc in instruction.docs -%}
+      /// {{ doc }}
+    {%- endfor -%}
+  {%- endif %}
 
-  // Accounts
-  {% for account in instruction.accounts %}
-  // {{ account.docs[0] if account.docs and account.docs[0] else ('The ' ~ (account.name | camelCase) ~ ' account.') }}
+  class {{ instruction.name | pascalCase }}Instruction {
+
+    // Accounts
+    {% for account in instruction.accounts %}
+      // {{ account.docs[0] if account.docs and account.docs[0] else ('The ' ~ (account.name | snakeCase ) ~ ' account.') }}
       {% if account.isOptional %}
-  final Ed25519HDPublicKey? {{ account.name | camelCase }};
-  {% else %}
-  final Ed25519HDPublicKey {{ account.name | camelCase }};
-  {% endif %}
+        final Ed25519HDPublicKey? {{ account.name | snakeCase }};
+      {% else %}
+        final Ed25519HDPublicKey {{ account.name | snakeCase }};
+      {% endif %}
 
       {% if account.isSigner === 'either' %}
-  /// Whether the {{ account.name | camelCase }} account is a signer.
-  final bool {{ account.name | camelCase }}IsSigner;
-  {% endif %}
+        /// Whether the {{ account.name | snakeCase }} account is a signer.
+        final bool {{ account.name | snakeCase }}IsSigner;
+      {% endif %}
     {% endfor %}
 
-  // Args
-  {% if args and args.length > 0 %}
+    // Args
+    {% if args and args.length > 0 %}
       {% for arg in args %}
-  final {{ arg.dartType }}
-        {{ arg.name }};
-  {% endfor %}
+        final {{ arg.dartType }} {{ arg.name | snakeCase }};
+      {% endfor %}
     {% endif %}
 
     {{ instruction.name | pascalCase }}Instruction({
-    {% for account in instruction.accounts -%}
-      {%- if account.isOptional -%}
-    this.{{ account.name | camelCase }},
-      {%- else -%}
-    required this.{{ account.name | camelCase }},
-      {%- endif -%}
-      {%- if account.isSigner === 'either' -%}
-    this.{{ account.name | camelCase }}IsSigner = false,
-      {%- endif -%}
-    {%- endfor -%}
-    {%- if args and args.length > 0 -%}
-      {%- for arg in args -%}
-    required this.{{ arg.name }},
+      {% for account in instruction.accounts -%}
+        {%- if account.isOptional -%}
+          this.{{ account.name | snakeCase }},
+        {%- else -%}
+          required this.{{ account.name | snakeCase }},
+        {%- endif -%}
+        {%- if account.isSigner === 'either' -%}
+          this.{{ account.name | snakeCase }}IsSigner = false,
+        {%- endif -%}
       {%- endfor -%}
-    {%- endif -%}
-  });
+      {%- if args and args.length > 0 -%}
+        {%- for arg in args -%}
+          required this.{{ arg.name | snakeCase }},
+        {%- endfor -%}
+      {%- endif -%}
+    });
 
-  /// Builds the `Instruction` (data = discriminator + args).
-  Instruction toInstruction({ List<AccountMeta> remainingAccounts = const [] }) {
-    final keys = <AccountMeta>[
-      {%- for account in instruction.accounts %}
+    /// Builds the `Instruction` (data = discriminator + args).
+    Instruction toInstruction({ List<AccountMeta> remainingAccounts = const [] }) {
+      final keys = <AccountMeta>[
+        {%- for account in instruction.accounts %}
           {%- if account.isOptional %}
-      if ({{ account.name | camelCase }} != null)
-        AccountMeta(
-          pubKey: {{ account.name | camelCase }}!,
-          isSigner: {%- if account.isSigner === 'either' -%}{{ account.name | camelCase }}IsSigner{%- else -%}{{ 'true' if account.isSigner else 'false' }}
-            {%- endif -%},
-          isWriteable: {{ 'true' if account.isWritable else 'false' }},
-        ),
-      {%- else %}
-      AccountMeta(
-        pubKey: {{ account.name | camelCase }},
-        isSigner: {%- if account.isSigner === 'either' -%}{{ account.name | camelCase }}IsSigner{%- else -%}{{ 'true' if account.isSigner else 'false' }}
-            {%- endif -%},
-        isWriteable: {{ 'true' if account.isWritable else 'false' }},
-      ),
-      {%- endif %}
+            if ({{ account.name | snakeCase }} != null)
+              AccountMeta(
+                pubKey: {{ account.name | snakeCase }}!,
+                isSigner: {%- if account.isSigner === 'either' -%}{{ account.name | snakeCase }}IsSigner{%- else -%}{{ 'true' if account.isSigner else 'false' }}{%- endif -%},
+                isWriteable: {{ 'true' if account.isWritable else 'false' }},
+              ),
+          {%- else %}
+            AccountMeta(
+              pubKey: {{ account.name | snakeCase }},
+              isSigner: {%- if account.isSigner === 'either' -%}{{ account.name | snakeCase }}IsSigner{%- else -%}{{ 'true' if account.isSigner else 'false' }}{%- endif -%},
+              isWriteable: {{ 'true' if account.isWritable else 'false' }},
+            ),
+          {%- endif %}
         {%- endfor %}
-    ];
+      ];
 
-    if (remainingAccounts.isNotEmpty) {
-      keys.addAll(remainingAccounts);
-    }
+      if (remainingAccounts.isNotEmpty) {
+        keys.addAll(remainingAccounts);
+      }
 
-    // Serialize: discriminator (8 bytes) + args
-    final writer = BinaryWriter();
-{%- if instruction.discriminator and instruction.discriminator.length > 0 %}
-writer.writeFixedU8Array(Uint8List.fromList({{ instruction.name | snakeCase | upper }}_DISCRIMINATOR));
-{%- endif %}
-        {%- if args and args.length > 0 %}
-          {%- for arg in args %}
-            {%- if arg.resolvedType.kind === 'numberTypeNode' %}
-    writer.writeU{{ arg.resolvedType.format | replace('u', '') }}({{ arg.name }});
-      {%- elif arg.resolvedType.kind === 'stringTypeNode' %}
-    writer.writeString({{ arg.name }});
-      {%- elif arg.resolvedType.kind === 'booleanTypeNode' %}
-    writer.writeBool({{ arg.name }});
-      {%- elif arg.resolvedType.kind === 'publicKeyTypeNode' %}
-    writer.writeFixedU8Array(Uint8List.fromList({{ arg.name }}.bytes));
-      {%- elif arg.resolvedType.kind === 'bytesTypeNode' %}
-    writer.writeBytes({{ arg.name }});
-      {%- else %}
-              {{ arg.name }}.toBorsh(writer);
+      // Serialize: discriminator (8 bytes) + args
+      final writer = BinaryWriter();
+      {%- if instruction.discriminator and instruction.discriminator.length > 0 %}
+        writer.writeDiscriminator(Uint8List.fromList({{ instruction.name | snakeCase | upper }}_DISCRIMINATOR));
       {%- endif %}
-          {%- endfor %}
-        {%- endif %}
-
-    return Instruction(
-      programId: {{ program.name | pascalCase }}Program.programId,
-      accounts: keys,
-      data: ByteArray(writer.toBytes()),
-    );
-  }
-}
-
-{# Nested structs (if any) #}
-        {% for nestedStruct in typeManifest.nestedStructs %}
-          {{ nestedStruct }}
+      {%- if fields and fields.length > 0 %}
+        {% for field in fields %}
+          {% if field.optional %}
+            writer.writeU8({{ field.name }} != null ? 1 : 0);
+            if ({{ field.name }} != null) {
+              {{ macros.borshWriter(field) | replace(field.name, field.name ~ '!') }}
+            }
+          {% else %}
+            {{ macros.borshWriter(field) }}
+          {% endif %}
         {% endfor %}
-      {% endblock %}
+      {%- endif %}
+
+      return Instruction(
+        programId: {{ program.name | pascalCase }}Program.programId,
+        accounts: keys,
+        data: ByteArray(writer.toBytes()),
+      );
+    }
+  }
+
+  {# Nested structs (if any) #}
+  {% for nestedStruct in typeManifest.nestedStructs %}
+    {{ nestedStruct }}
+  {% endfor %}
+{% endblock %}
