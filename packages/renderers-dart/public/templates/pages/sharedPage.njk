@@ -26,7 +26,10 @@ class AccountNotFoundError extends Error {
 
 /// Binary reader for decoding Borsh-encoded data.
 class BinaryReader {
-  final ByteData _data;
+  final ByteData
+      _data; // holds the raw binary data buffer, that i read from. Represents entire sequence of bytes.
+
+  // Offset tracks the current byte position in the buffer; advance it after each read to ensure correct sequential decoding.
   int _offset = 0;
 
   /// Creates a new BinaryReader.
@@ -141,9 +144,13 @@ class BinaryReader {
       _offset += 4;
     }
 
-    final bytes = Uint8List.view(_data.buffer, _data.offsetInBytes + _offset, length);
-    _offset += length;
-    return bytes;
+    return readAlignedArray<Uint8List>(
+      1,
+      length,
+      Uint8List.view,
+      1,
+      (offset) => _data.getUint8(offset),
+    );
   }
 
   /// Reads a fixed-size i8 array of bytes.
@@ -154,9 +161,13 @@ class BinaryReader {
       _offset += 4;
     }
 
-    final bytes = Int8List.view(_data.buffer, _data.offsetInBytes + _offset, length);
-    _offset += length;
-    return bytes;
+    return readAlignedArray<Int8List>(
+      1,
+      length,
+      Int8List.view,
+      1,
+      (offset) => _data.getInt8(offset),
+    );
   }
 
   /// Reads a fixed-size u16 array of bytes.
@@ -167,10 +178,13 @@ class BinaryReader {
       _offset += 4;
     }
 
-    final bytes =
-        Uint16List.view(_data.buffer, _data.offsetInBytes + _offset, length);
-    _offset += length * 2;
-    return bytes;
+    return readAlignedArray<Uint16List>(
+      2,
+      length,
+      Uint16List.view,
+      2,
+      (offset) => _data.getUint16(offset, Endian.little),
+    );
   }
 
   /// Reads a fixed-size i16 array of bytes.
@@ -181,10 +195,13 @@ class BinaryReader {
       _offset += 4;
     }
 
-    final bytes =
-        Int16List.view(_data.buffer, _data.offsetInBytes + _offset, length);
-    _offset += length * 2;
-    return bytes;
+    return readAlignedArray<Int16List>(
+      2,
+      length,
+      Int16List.view,
+      2,
+      (offset) => _data.getInt16(offset, Endian.little),
+    );
   }
 
   /// Reads a fixed-size u32 array of bytes.
@@ -195,24 +212,30 @@ class BinaryReader {
       _offset += 4;
     }
 
-    final bytes =
-        Uint32List.view(_data.buffer, _data.offsetInBytes + _offset, length);
-    _offset += length * 4;
-    return bytes;
+    return readAlignedArray<Uint32List>(
+      4,
+      length,
+      Uint32List.view,
+      4,
+      (offset) => _data.getUint32(offset, Endian.little),
+    );
   }
 
   /// Reads a fixed-size i32 array of bytes.
   Int32List readI32Array([int? length]) {
-     if (length == null) {
+    if (length == null) {
       // Read the 4-byte little-endian length prefix (Borsh Vec)
       length = _data.getUint32(_offset, Endian.little);
       _offset += 4;
     }
 
-    final bytes =
-        Int32List.view(_data.buffer, _data.offsetInBytes + _offset, length);
-    _offset += length * 4;
-    return bytes;
+    return readAlignedArray<Int32List>(
+      4,
+      length,
+      Int32List.view,
+      4,
+      (offset) => _data.getInt32(offset, Endian.little),
+    );
   }
 
   /// Reads a fixed-size u64 array of bytes.
@@ -223,13 +246,13 @@ class BinaryReader {
       _offset += 4;
     }
 
-    final values = Uint64List(length);
-    for (int i = 0; i < length; i++) {
-      values[i] = _data.getUint64(_offset, Endian.little);
-      _offset += 8;
-    }
-
-    return values;
+    return readAlignedArray<Uint64List>(
+      8,
+      length,
+      Uint64List.view,
+      8,
+      (offset) => _data.getUint64(offset, Endian.little),
+    );
   }
 
   /// Reads a fixed-size i64 array of bytes.
@@ -240,12 +263,13 @@ class BinaryReader {
       _offset += 4;
     }
 
-    final values = Int64List(length);
-    for (int i = 0; i < length; i++) {
-      values[i] = _data.getInt64(_offset, Endian.little);
-      _offset += 8;
-    }
-    return values;
+    return readAlignedArray<Int64List>(
+      8,
+      length,
+      Int64List.view,
+      8,
+      (offset) => _data.getInt64(offset, Endian.little),
+    );
   }
 
   /// Reads a variable-length array of generic items.
@@ -263,11 +287,57 @@ class BinaryReader {
     final length = readU32();
     return readU8Array(length);
   }
+
+  // ========= Utils for alignment-safe array reading ========
+  
+  // This function handles the problem of buffer's offset that is not properly aligned for typed array views.
+  // It happens because i have fixed-size and prefixed-size arrays.
+  T readAlignedArray<T>(
+    int alignment,
+    int length,
+    T Function(ByteBuffer buffer, int offset, int length) viewConstructor,
+    int bytesPerElement,
+    int Function(int offset) manualGetter,
+  ) {
+    // Check the offset alignment for `Uint*List.view` it should be multiple of element size
+    if ((_data.offsetInBytes + _offset) % alignment == 0) {
+      final arr =
+          viewConstructor(_data.buffer, _data.offsetInBytes + _offset, length);
+      _offset += length * bytesPerElement;
+      return arr;
+    } else {
+      // Manual read if not aligned
+      // For example, for Uint16List:
+      final arr = List.generate(length, (i) {
+        final value = manualGetter(_offset);
+        _offset += bytesPerElement;
+        return value;
+      });
+      // Convert to typed list
+      if (T == Uint8List) return Uint8List.fromList(arr) as T;
+      if (T == Uint16List) return Uint16List.fromList(arr) as T;
+      if (T == Uint32List) return Uint32List.fromList(arr) as T;
+      if (T == Uint64List) return Uint64List.fromList(arr) as T;
+      if (T == Int8List) return Int8List.fromList(arr) as T;
+      if (T == Int16List) return Int16List.fromList(arr) as T;
+      if (T == Int32List) return Int32List.fromList(arr) as T;
+      if (T == Int64List) return Int64List.fromList(arr) as T;
+      // ...add more types as needed
+      return arr as T;
+    }
+  }
 }
 
 /// Binary writer for encoding Borsh data.
 class BinaryWriter {
   final List<int> _bytes = [];
+
+  void writeDiscriminator(Uint8List discriminator) {
+    if (discriminator.length != 8) {
+      throw ArgumentError('Discriminator must be exactly 8 bytes');
+    }
+    _bytes.addAll(discriminator);
+  }
 
   /// Writes a boolean value.
   void writeBool(bool value) {
@@ -356,44 +426,132 @@ class BinaryWriter {
     _bytes.addAll(bytes);
   }
 
-  /// Writes a fixed-size u8 array of bytes.
-  void writeFixedU8Array(Uint8List value) {
-    _bytes.addAll(value);
+  /// Writes a fixed-size and prefixed-size u8 array of bytes.
+  void writeU8Array(Uint8List value, int? length) {
+    if (length == null) {
+      // Variable-length: write length prefix
+      writeU32(value.length);
+      for (final v in value) {
+        writeU8(v);
+      }
+    } else {
+      // Fixed-size: write exactly [length] elements, no prefix
+      for (int i = 0; i < length; i++) {
+        writeU8(value[i]);
+      }
+    }
   }
 
-  /// Writes a fixed-size i8 array of bytes.
-  void writeFixedI8Array(Int8List value) {
-    _bytes.addAll(value);
+  /// Writes a fixed-size and prefixed-size u8 array of bytes.
+  void writeI8Array(Int8List value, int? length) {
+    if (length == null) {
+      // Variable-length: write length prefix
+      writeU32(value.length);
+      for (final v in value) {
+        writeI8(v);
+      }
+    } else {
+      // Fixed-size: write exactly [length] elements, no prefix
+      for (int i = 0; i < length; i++) {
+        writeI8(value[i]);
+      }
+    }
   }
 
-  /// Writes a fixed-size u16 array of bytes.
-  void writeFixedU16Array(Uint16List value) {
-    _bytes.addAll(value);
+  /// Writes a fixed-size and prefixed-size u16 array of bytes.
+  void writeU16Array(Uint16List value, int? length) {
+    if (length == null) {
+      // Variable-length: write length prefix
+      writeU32(value.length);
+      for (final v in value) {
+        writeU16(v);
+      }
+    } else {
+      // Fixed-size: write exactly [length] elements, no prefix
+      for (int i = 0; i < length; i++) {
+        writeU16(value[i]);
+      }
+    }
   }
 
-  /// Writes a fixed-size i16 array of bytes.
-  void writeFixedI16Array(Int16List value) {
-    _bytes.addAll(value);
+  /// Writes a fixed-size and prefixed-size i16 array of bytes.
+  void writeI16Array(Int16List value, int? length) {
+    if (length == null) {
+      // Variable-length: write length prefix
+      writeU32(value.length);
+      for (final v in value) {
+        writeI16(v);
+      }
+    } else {
+      // Fixed-size: write exactly [length] elements, no prefix
+      for (int i = 0; i < length; i++) {
+        writeI16(value[i]);
+      }
+    }
   }
 
-  /// Writes a fixed-size u32 array of bytes.
-  void writeFixedU32Array(Uint32List value) {
-    _bytes.addAll(value);
+  /// Writes a fixed-size and prefixed-size i16 array of bytes.
+  void writeU32Array(Uint32List value, int? length) {
+    if (length == null) {
+      // Variable-length: write length prefix
+      writeU32(value.length);
+      for (final v in value) {
+        writeU32(v);
+      }
+    } else {
+      // Fixed-size: write exactly [length] elements, no prefix
+      for (int i = 0; i < length; i++) {
+        writeU32(value[i]);
+      }
+    }
   }
 
   /// Writes a fixed-size i32 array of bytes.
-  void writeFixedI32Array(Int32List value) {
-    _bytes.addAll(value);
+  void writeI32Array(Int32List value, int? length) {
+    if (length == null) {
+      // Variable-length: write length prefix
+      writeU32(value.length);
+      for (final v in value) {
+        writeI32(v);
+      }
+    } else {
+      // Fixed-size: write exactly [length] elements, no prefix
+      for (int i = 0; i < length; i++) {
+        writeI32(value[i]);
+      }
+    }
   }
 
   /// Writes a fixed-size u64 array of bytes.
-  void writeFixedU64Array(Uint64List value) {
-    _bytes.addAll(value);
+  void writeU64Array(Uint64List value, int? length) {
+    if (length == null) {
+      // Variable-length: write length prefix
+      writeU32(value.length);
+      for (final v in value) {
+        writeU64(BigInt.from(v));
+      }
+    } else {
+      // Fixed-size: write exactly [length] elements, no prefix
+      for (int i = 0; i < length; i++) {
+        writeU64(BigInt.from(value[i]));
+      }
+    }
   }
 
   /// Writes a fixed-size i64 array of bytes.
-  void writeFixedI64Array(Int64List value) {
-    _bytes.addAll(value);
+  void writeI64Array(Int64List value, int? length) {
+    if (length == null) {
+      // Variable-length: write length prefix
+      writeU32(value.length);
+      for (final v in value) {
+        writeI64(BigInt.from(v));
+      }
+    } else {
+      // Fixed-size: write exactly [length] elements, no prefix
+      for (int i = 0; i < length; i++) {
+        writeI64(BigInt.from(value[i]));
+      }
+    }
   }
 
   /// Writes a variable-length array of bytes.

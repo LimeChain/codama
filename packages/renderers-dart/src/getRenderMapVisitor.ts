@@ -177,23 +177,35 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                     const args = node.arguments
                         .filter(a => a.name !== 'discriminator')
                         .map(a => {
-                            const argManifest = visit(a.type, getTypeManifestVisitor({
+                            const argManifest: TypeManifest = visit(a.type, getTypeManifestVisitor({
                                 getImportFrom,
                                 nestedStruct: true,
                                 parentName: `${pascalCase(node.name)}InstructionArgs`,
                             }));
 
-                            imports.mergeWith(argManifest.imports);
-                            const rt = resolveNestedTypeNode(a.type);
-                            return {
-                                dartType: argManifest.type,
-                                name: camelCase(a.name),
-                                resolvedType: rt,
-                            };
-                        });
+                        imports.mergeWith(argManifest.imports);
+                        const rt = resolveNestedTypeNode(a.type);
+                        return {
+                            dartType: argManifest.type,
+                            name: camelCase(a.name),
+                            resolvedType: rt,
+                        };
+                    });
 
+                    // I treat args as a field so i can reuse the recursive logic to handle all kind of fields
+                    const structTypeNames = getAllDefinedTypesInNode(programNode);
+                    const fields = extractFieldsFromTypeManifest(typeManifest).map(field => {
+                        const baseType = getBaseType(field.type).replace(/\?$/, ''); // Remove optional marker `?` for the check
+                        return {
+                            ...field,
+                            baseType: baseType,
+                            isStruct: structTypeNames.has(baseType)
+                        }
+                    });
+            
                     const context = {
                         args,
+                        fields: fields,
                         imports: importsString,
                         instruction: {
                             ...node,

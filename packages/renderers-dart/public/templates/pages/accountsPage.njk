@@ -82,7 +82,7 @@ void toBorsh(BinaryWriter writer) {
 
   {% if account.discriminator %}
   // Write discriminator
-  writer.writeFixedU8Array(Uint8List.fromList({{ account.name | snakeCase | upper }}_DISCRIMINATOR));
+  writer.writeDiscriminator(Uint8List.fromList({{ account.name | snakeCase | upper }}_DISCRIMINATOR));
   {% endif %}
 
     // Write account data
