@@ -1,14 +1,27 @@
 import { Command } from 'commander';
+import pico from 'picocolors';
 import prompts, { PromptType } from 'prompts';
 
 import { Config, ScriptConfig, ScriptName } from '../config';
-import { canRead, logBanner, logSuccess, resolveRelativePath, writeFile } from '../utils';
+import {
+    canRead,
+    CliError,
+    importModuleItem,
+    installMissingDependencies,
+    isRootNode,
+    logBanner,
+    logSuccess,
+    PROMPT_OPTIONS,
+    resolveRelativePath,
+    writeFile,
+} from '../utils';
 
 export function setInitCommand(program: Command): void {
     program
         .command('init')
         .argument('[output]', 'Optional path used to output the configuration file')
         .option('-d, --default', 'Bypass prompts and select all defaults options')
+        .option('--force', 'Overwrite existing configuration file, if any')
         .option('--js', 'Forces the output to be a JavaScript file')
         .option('--gill', 'Forces the output to be a gill based JavaScript file')
         .action(doInit);
@@ -16,27 +29,36 @@ export function setInitCommand(program: Command): void {
 
 type InitOptions = {
     default?: boolean;
-    js?: boolean;
+    force?: boolean;
     gill?: boolean;
+    js?: boolean;
 };
-
-type ConfigFileType = 'gill' | 'js' | 'json';
 
 async function doInit(explicitOutput: string | undefined, options: InitOptions) {
     const output = getOutputPath(explicitOutput, options);
-    let configFileType: ConfigFileType = output.endsWith('.js') ? 'js' : 'json';
-    if (options.gill) configFileType = 'gill';
-    else if (options.js) configFileType = 'js';
+    const configFileType = getConfigFileType(output, options);
 
-    if (await canRead(output)) {
-        throw new Error(`Configuration file already exists at "${output}".`);
+    if (!options.force && (await canRead(output))) {
+        throw new CliError(`Configuration file already exists.`, [`${pico.bold('Path')}: ${output}`]);
     }
 
+    // Start prompts.
     logBanner();
-    const result = await getPromptResult(options);
+    const result = await getPromptResult(options, configFileType);
+
+    // Check dependencies.
+    const isAnchor = await isAnchorIdl(result.idlPath);
+    await installMissingDependencies(`Your configuration requires additional dependencies.`, [
+        ...(isAnchor ? ['@codama/nodes-from-anchor'] : []),
+        ...(result.scripts.includes('js') ? ['@codama/renderers-js'] : []),
+        ...(result.scripts.includes('rust') ? ['@codama/renderers-rust'] : []),
+    ]);
+
+    // Write configuration file.
     const content = getContentFromPromptResult(result, configFileType);
     await writeFile(output, content);
-    logSuccess(`Configuration file created at "${output}".`);
+    console.log();
+    logSuccess(pico.bold('Configuration file created.'), [`${pico.bold('Path')}: ${output}`]);
 }
 
 function getOutputPath(explicitOutput: string | undefined, options: Pick<InitOptions, 'gill' | 'js'>): string {
@@ -54,7 +76,10 @@ type PromptResult = {
     scripts: string[];
 };
 
-async function getPromptResult(options: Pick<InitOptions, 'default'>): Promise<PromptResult> {
+async function getPromptResult(
+    options: Pick<InitOptions, 'default'>,
+    configFileType: ConfigFileType,
+): Promise<PromptResult> {
     const defaults = getDefaultPromptResult();
     if (options.default) {
         return defaults;
@@ -64,7 +89,7 @@ async function getPromptResult(options: Pick<InitOptions, 'default'>): Promise<P
         (script: string, type: PromptType = 'text') =>
         (_: unknown, values: { scripts: string[] }) =>
             values.scripts.includes(script) ? type : null;
-    const result: PromptResult = await prompts(
+    return await prompts(
         [
             {
                 initial: defaults.idlPath,
@@ -81,6 +106,14 @@ async function getPromptResult(options: Pick<InitOptions, 'default'>): Promise<P
                 message: 'Which script preset would you like to use?',
                 name: 'scripts',
                 type: 'multiselect',
+                onRender() {
+                    if (configFileType === 'gill') {
+                        const value = (this as unknown as { value: prompts.Choice[] }).value;
+                        const jsChoice = value.find(choice => choice.value === 'js')!;
+                        jsChoice.description = pico.yellow('Required with --gill option.');
+                        jsChoice.selected = true;
+                    }
+                },
             },
             {
                 initial: defaults.jsPath,
@@ -101,14 +134,8 @@ async function getPromptResult(options: Pick<InitOptions, 'default'>): Promise<P
                 type: hasScript('rust'),
             },
         ],
-        {
-            onCancel: () => {
-                throw new Error('Operation cancelled.');
-            },
-        },
+        PROMPT_OPTIONS,
     );
-
-    return result;
 }
 
 function getDefaultPromptResult(): PromptResult {
@@ -121,7 +148,33 @@ function getDefaultPromptResult(): PromptResult {
     };
 }
 
+type ConfigFileType = 'gill' | 'js' | 'json';
+function getConfigFileType(output: string, options: Pick<InitOptions, 'gill' | 'js'>): ConfigFileType {
+    if (options.gill) return 'gill';
+    else if (options.js) return 'js';
+    return output.endsWith('.js') ? 'js' : 'json';
+}
+
 function getContentFromPromptResult(result: PromptResult, configFileType: ConfigFileType): string {
+    switch (configFileType) {
+        case 'gill':
+            return getContentForGill(result);
+        case 'js':
+            return (
+                `export default ` +
+                JSON.stringify(getConfigFromPromptResult(result), null, 4)
+                    // Remove quotes around property names
+                    .replace(/"([^"]+)":/g, '$1:')
+                    // Convert double-quoted strings to single quotes
+                    .replace(/"([^"]*)"/g, "'$1'")
+            );
+        case 'json':
+        default:
+            return JSON.stringify(getConfigFromPromptResult(result), null, 4);
+    }
+}
+
+function getConfigFromPromptResult(result: PromptResult): Config {
     const scripts: Record<ScriptName, ScriptConfig> = {};
     if (result.scripts.includes('js')) {
         scripts.js = {
@@ -135,26 +188,30 @@ function getContentFromPromptResult(result: PromptResult, configFileType: Config
             args: [result.rustPath, { crateFolder: result.rustCrate, formatCode: true }],
         };
     }
-    const content: Config = { idl: result.idlPath, before: [], scripts };
+    return { idl: result.idlPath, before: [], scripts };
+}
 
-    if (configFileType == 'json') {
-        return JSON.stringify(content, null, 4);
-    } else if (configFileType == 'gill') {
-        return `import { createCodamaConfig } from "gill";\n\n` +
-            `export default createCodamaConfig({ \n\t` +
-            `idl: "${result.idlPath}", \n\t` +
-            `clientJs: "${result.jsPath}", \n` +
-            result.scripts.includes('rust')
-            ? `clientRust: "${result.rustPath}", \n`
-            : `` + `});`;
-    }
+function getContentForGill(result: PromptResult): string {
+    const attributes: string[] = [
+        `idl: "${result.idlPath}"`,
+        `clientJs: "${result.jsPath}"`,
+        ...(result.scripts.includes('rust') ? [`clientRust: "${result.rustPath}"`] : []),
+    ];
+    const attributesString = attributes.map(attr => `    ${attr},\n`).join('');
 
     return (
-        'export default ' +
-        JSON.stringify(content, null, 4)
-            // Remove quotes around property names
-            .replace(/"([^"]+)":/g, '$1:')
-            // Convert double-quoted strings to single quotes
-            .replace(/"([^"]*)"/g, "'$1'")
+        `import { createCodamaConfig } from "gill";\n\n` +
+        `export default createCodamaConfig({\n${attributesString}});\n`
     );
+}
+
+async function isAnchorIdl(idlPath: string): Promise<boolean> {
+    const resolvedIdlPath = resolveRelativePath(idlPath);
+    if (!(await canRead(resolvedIdlPath))) return false;
+    try {
+        const idlContent = await importModuleItem({ identifier: 'IDL', from: resolvedIdlPath });
+        return !isRootNode(idlContent);
+    } catch {
+        return false;
+    }
 }

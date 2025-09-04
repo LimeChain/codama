@@ -1,3 +1,4 @@
+export * from './fragment';
 export * from './fs';
-export * from './RenderMap';
-export * from './writeRenderMapVisitor';
+export * from './path';
+export * from './renderMap';

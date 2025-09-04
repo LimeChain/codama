@@ -1,5 +1,31 @@
 # @codama/renderers-rust
 
+## 1.2.2
+
+### Patch Changes
+
+- Updated dependencies []:
+    - @codama/errors@1.3.3
+    - @codama/nodes@1.3.3
+    - @codama/visitors-core@1.3.3
+    - @codama/renderers-core@1.0.19
+
+## 1.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`b912ac8`](https://github.com/codama-idl/codama/commit/b912ac89b2d041c1f783da8d6f023fdf77dbd7e7)]:
+    - @codama/visitors-core@1.3.2
+    - @codama/renderers-core@1.0.18
+    - @codama/errors@1.3.2
+    - @codama/nodes@1.3.2
+
+## 1.2.0
+
+### Minor Changes
+
+- [#737](https://github.com/codama-idl/codama/pull/737) [`7b7dc00`](https://github.com/codama-idl/codama/commit/7b7dc00e925827887c354e983dcc0eb273e55390) Thanks [@sonicfromnewyoke](https://github.com/sonicfromnewyoke)! - get rid of deprecated methods & bump sol deps
+
 ## 1.1.3
 
 ### Patch Changes

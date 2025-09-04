@@ -1,5 +1,32 @@
 # @codama/renderers
 
+## 1.0.31
+
+### Patch Changes
+
+- Updated dependencies [[`a32c424`](https://github.com/codama-idl/codama/commit/a32c42450bea12a53ccc120e5bcee1c20868f4e0)]:
+    - @codama/renderers-js@1.3.4
+    - @codama/renderers-rust@1.2.2
+    - @codama/renderers-js-umi@1.1.19
+
+## 1.0.30
+
+### Patch Changes
+
+- [#763](https://github.com/codama-idl/codama/pull/763) [`4d0d735`](https://github.com/codama-idl/codama/commit/4d0d735361aa3940e3f2b5bf316b0be98e188ac5) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Deprecate exports of `@codama/renderers` package
+
+- Updated dependencies [[`992176b`](https://github.com/codama-idl/codama/commit/992176b6ea8086bbdfbfe862192669a96df4838c)]:
+    - @codama/renderers-js@1.3.3
+    - @codama/renderers-js-umi@1.1.18
+    - @codama/renderers-rust@1.2.1
+
+## 1.0.29
+
+### Patch Changes
+
+- Updated dependencies [[`7b7dc00`](https://github.com/codama-idl/codama/commit/7b7dc00e925827887c354e983dcc0eb273e55390)]:
+    - @codama/renderers-rust@1.2.0
+
 ## 1.0.28
 
 ### Patch Changes
