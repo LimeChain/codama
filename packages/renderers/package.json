@@ -38,8 +38,8 @@
         "test:types": "zx ../../node_modules/@codama/internals/scripts/test-types.mjs"
     },
     "dependencies": {
-        "@codama/renderers-js": "workspace:*",
         "@codama/renderers-dart": "workspace:*",
+        "@codama/renderers-js": "workspace:*",
         "@codama/renderers-js-umi": "workspace:*",
         "@codama/renderers-rust": "workspace:*"
     },
