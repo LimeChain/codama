@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { Config, getConfig, ScriptName, ScriptsConfig, VisitorConfig, VisitorPath } from './config';
 import { ProgramOptions } from './programOptions';
 import {
+    CliError,
     getRootNodeFromIdl,
     importModuleItem,
     isLocalModulePath,
@@ -30,7 +31,7 @@ export type ParsedVisitorConfig<T extends readonly unknown[] = readonly unknown[
 }>;
 
 export async function getParsedConfigFromCommand(cmd: Command): Promise<ParsedConfig> {
-    return await getParsedConfig(cmd.optsWithGlobals() as ProgramOptions);
+    return await getParsedConfig(cmd.optsWithGlobals());
 }
 
 export async function getParsedConfig(options: Pick<ProgramOptions, 'config' | 'idl'>): Promise<ParsedConfig> {
@@ -44,8 +45,8 @@ async function parseConfig(
     options: Pick<ProgramOptions, 'idl'>,
 ): Promise<ParsedConfig> {
     const idlPath = parseIdlPath(config, configPath, options);
-    const idlContent = await importModuleItem('IDL', idlPath);
-    const rootNode = getRootNodeFromIdl(idlContent);
+    const idlContent = await importModuleItem({ identifier: 'IDL', from: idlPath });
+    const rootNode = await getRootNodeFromIdl(idlContent);
     const scripts = parseScripts(config.scripts ?? {}, configPath);
     const visitors = (config.before ?? []).map((v, i) => parseVisitorConfig(v, configPath, i, null));
 
@@ -63,7 +64,7 @@ function parseIdlPath(
     if (config.idl) {
         return resolveConfigPath(config.idl, configPath);
     }
-    throw new Error('No IDL identified. Please provide the `--idl` option or set it in the config file.');
+    throw new CliError('No IDL identified. Please provide the `--idl` option or set it in the configuration file.');
 }
 
 function parseScripts(scripts: ScriptsConfig, configPath: string | null): ParsedScriptsConfig {
