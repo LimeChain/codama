@@ -1,5 +1,36 @@
 # @codama/visitors
 
+## 1.3.4
+
+### Patch Changes
+
+- Updated dependencies [[`1f9f614`](https://github.com/codama-idl/codama/commit/1f9f614d3ed02439135a6037343f139e8a127c48)]:
+    - @codama/visitors-core@1.3.4
+    - @codama/errors@1.3.4
+    - @codama/nodes@1.3.4
+
+## 1.3.3
+
+### Patch Changes
+
+- [#778](https://github.com/codama-idl/codama/pull/778) [`a32c424`](https://github.com/codama-idl/codama/commit/a32c42450bea12a53ccc120e5bcee1c20868f4e0) Thanks [@macalinao](https://github.com/macalinao)! - Allow specifying docs for PDA nodes in addPdasVisitor
+
+- Updated dependencies []:
+    - @codama/errors@1.3.3
+    - @codama/nodes@1.3.3
+    - @codama/visitors-core@1.3.3
+
+## 1.3.2
+
+### Patch Changes
+
+- [#747](https://github.com/codama-idl/codama/pull/747) [`99c299d`](https://github.com/codama-idl/codama/commit/99c299d65eb354100d97553111d85c73109533e7) Thanks [@mcintyre94](https://github.com/mcintyre94)! - Allow updating more fields in `updateInstructionsVisitor`
+
+- Updated dependencies [[`b912ac8`](https://github.com/codama-idl/codama/commit/b912ac89b2d041c1f783da8d6f023fdf77dbd7e7)]:
+    - @codama/visitors-core@1.3.2
+    - @codama/errors@1.3.2
+    - @codama/nodes@1.3.2
+
 ## 1.3.1
 
 ### Patch Changes

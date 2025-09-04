@@ -1,23 +1,51 @@
 import pico from 'picocolors';
 
-export function logSuccess(...args: unknown[]): void {
-    console.log(pico.green('[Success]'), ...args);
+type LogLevel = 'debug' | 'error' | 'info' | 'success' | 'warning';
+
+type LogOptions = {
+    level: LogLevel;
+    message: string;
+    items?: string[];
+};
+
+function getLogLevelInfo(logLevel: LogLevel) {
+    const identity = (text: string) => text;
+    const infos: Record<LogLevel, [string, (text: string) => string, (text: string) => string]> = {
+        success: ['✔', pico.green, pico.green],
+        info: ['→', pico.blueBright, identity],
+        warning: ['▲', pico.yellow, pico.yellow],
+        error: ['✖', pico.red, pico.red],
+        debug: ['✱', pico.magenta, pico.magenta],
+    };
+
+    return {
+        icon: infos[logLevel][0],
+        color: infos[logLevel][1],
+        messageColor: infos[logLevel][2],
+    };
 }
 
-export function logInfo(...args: unknown[]): void {
-    console.log(pico.blueBright('[Info]'), ...args);
+const logWrapper = (level: LogLevel) => (message: string, items?: string[]) => log({ level, message, items });
+export const logSuccess = logWrapper('success');
+export const logError = logWrapper('error');
+export const logInfo = logWrapper('info');
+export const logWarning = logWrapper('warning');
+export const logDebug = logWrapper('debug');
+
+function log({ level, message, items }: LogOptions): void {
+    const { icon, color, messageColor } = getLogLevelInfo(level);
+    console.log(color(icon), messageColor(message));
+    if (items) {
+        logItems(items, color);
+    }
 }
 
-export function logWarning(...args: unknown[]): void {
-    console.log(pico.yellow('[Warning]'), ...args);
-}
-
-export function logError(...args: unknown[]): void {
-    console.log(pico.red('[Error]'), ...args);
-}
-
-export function logDebug(...args: unknown[]): void {
-    console.log(pico.magenta('[Debug]'), ...args);
+function logItems(items: string[], color?: (text: string) => string): void {
+    const colorFn = color ?? (text => text);
+    items.forEach((item, index) => {
+        const prefix = index === items.length - 1 ? '└─' : '├─';
+        console.log('  ' + colorFn(prefix), item);
+    });
 }
 
 export function logBanner(): void {

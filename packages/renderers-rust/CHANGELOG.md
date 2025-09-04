@@ -1,5 +1,43 @@
 # @codama/renderers-rust
 
+## 1.2.3
+
+### Patch Changes
+
+- [#788](https://github.com/codama-idl/codama/pull/788) [`44f725e`](https://github.com/codama-idl/codama/commit/44f725e8243edb19b60a3f046974aaef87563f93) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Refactor fragments and render maps so that they are functional and immutable.
+
+- Updated dependencies [[`d6e2349`](https://github.com/codama-idl/codama/commit/d6e23493ee0228765ec3dbdb5c0ff9e712394b29), [`1f9f614`](https://github.com/codama-idl/codama/commit/1f9f614d3ed02439135a6037343f139e8a127c48), [`44f725e`](https://github.com/codama-idl/codama/commit/44f725e8243edb19b60a3f046974aaef87563f93)]:
+    - @codama/renderers-core@1.1.0
+    - @codama/visitors-core@1.3.4
+    - @codama/errors@1.3.4
+    - @codama/nodes@1.3.4
+
+## 1.2.2
+
+### Patch Changes
+
+- Updated dependencies []:
+    - @codama/errors@1.3.3
+    - @codama/nodes@1.3.3
+    - @codama/visitors-core@1.3.3
+    - @codama/renderers-core@1.0.19
+
+## 1.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`b912ac8`](https://github.com/codama-idl/codama/commit/b912ac89b2d041c1f783da8d6f023fdf77dbd7e7)]:
+    - @codama/visitors-core@1.3.2
+    - @codama/renderers-core@1.0.18
+    - @codama/errors@1.3.2
+    - @codama/nodes@1.3.2
+
+## 1.2.0
+
+### Minor Changes
+
+- [#737](https://github.com/codama-idl/codama/pull/737) [`7b7dc00`](https://github.com/codama-idl/codama/commit/7b7dc00e925827887c354e983dcc0eb273e55390) Thanks [@sonicfromnewyoke](https://github.com/sonicfromnewyoke)! - get rid of deprecated methods & bump sol deps
+
 ## 1.1.3
 
 ### Patch Changes

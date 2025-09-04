@@ -7,7 +7,7 @@
     "devDependencies": {
         "@ava/typescript": "^6.0.0",
         "@solana/eslint-config-solana": "^3.0.0",
-        "@solana/kit": "^2.3.0",
+        "@solana/kit": "^3.0.1",
         "@typescript-eslint/eslint-plugin": "^7.3.1",
         "@typescript-eslint/parser": "^7.3.1",
         "ava": "^6.4.1",
@@ -15,9 +15,9 @@
         "prettier": "^3.6.2",
         "rimraf": "^6.0.1",
         "tsup": "^8.5.0",
-        "typedoc": "^0.28.8",
-        "typedoc-plugin-missing-exports": "^4.0.0",
-        "typescript": "^5.8.3"
+        "typedoc": "^0.28.12",
+        "typedoc-plugin-missing-exports": "^4.1.0",
+        "typescript": "^5.9.2"
     },
     "engines": {
         "node": ">=20.0.0"
