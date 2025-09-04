@@ -42,7 +42,10 @@
 {% endmacro %}
 
 {% macro recursiveReader(depth, baseType, isStruct, size) %}
-  {% if depth == 0 %}
+  {% if depth > 5 %}
+    // ERROR: Nesting depth exceeds supported limit (5)
+    throw Exception('Nesting depth exceeds supported limit(5)');
+  {% elif depth == 0 %}
     {% if isStruct %}
       {{ baseType }}Borsh.fromBorsh(reader)
     {% else %}
@@ -87,7 +90,7 @@
   {% elif baseType == 'bool' %}
     reader.readBool()
   {% elif baseType == 'Ed25519HDPublicKey' %}
-    Ed25519HDPublicKey(Uint8List.fromList(reader.readU8Array(32)))
+    Ed25519HDPublicKey(reader.readPubkey())
   {% else %}
     /// TODO: I need to provide panic or error guard to indicate that user is doing something that is not supported
     reader.readUnknownType('{{ baseType }}')
@@ -101,7 +104,10 @@
 {% endmacro %}
 
 {% macro recursiveWriter(varName, depth, baseType, isStruct, size) %}
-  {% if depth == 0 %}
+  {% if depth > 5 %}
+    // ERROR: Nesting depth exceeds supported limit (5)
+    throw Exception('Nesting depth exceeds supported limit(5)');
+  {% elif depth == 0 %}
     {% if isStruct %}
       {{ varName }}.toBorsh(writer);
     {% else %}
