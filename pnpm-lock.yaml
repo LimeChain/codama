@@ -210,6 +210,9 @@ importers:
       '@codama/renderers-dart':
         specifier: workspace:*
         version: link:../renderers-dart
+      '@codama/renderers-dart':
+        specifier: workspace:*
+        version: link:../renderers-dart
       '@codama/renderers-js':
         specifier: workspace:*
         version: link:../renderers-js
