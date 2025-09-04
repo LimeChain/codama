@@ -43,6 +43,14 @@ class BinaryReader {
     return bytes;
   }
 
+  /// Reads a single public key (32 raw bytes, no prefix).
+  Uint8List readPubkey() {
+    final length = 32;
+    final bytes = Uint8List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length;
+    return bytes;
+  }
+
   /// Reads a boolean value.
   bool readBool() {
     final value = _data.getUint8(_offset) != 0;
