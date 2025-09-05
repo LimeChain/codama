@@ -13,7 +13,7 @@ import {
     snakeCase,
     structTypeNodeFromInstructionArgumentNodes,
 } from '@codama/nodes';
-import { RenderMap } from '@codama/renderers-core';
+import { addToRenderMap, mergeRenderMaps, RenderMap, renderMap } from '@codama/renderers-core';
 import {
     extendVisitor,
     findProgramNodeFromPath,
@@ -24,7 +24,6 @@ import {
     recordNodeStackVisitor,
     staticVisitor,
     visit,
-    Visitor,
 } from '@codama/visitors-core';
 import { join } from 'path';
 
@@ -48,9 +47,7 @@ function getBaseType(type: string): string {
     return match ? match[1] : type;
 }
 
-export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<RenderMap,
-'accountNode' | 'definedTypeNode' | 'instructionNode' | 'pdaNode' | 'programNode' | 'rootNode'
-> {
+export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
     const linkables = new LinkableDictionary();
     const stack = new NodeStack();
 
@@ -64,7 +61,8 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
     };
 
     return pipe(
-        staticVisitor(() => new RenderMap(), {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+        staticVisitor(() => renderMap(), {
             keys: [
                 'rootNode',
                 'programNode',
@@ -102,7 +100,10 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                         }
                     });
 
-                    return new RenderMap().add(
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+                    return addToRenderMap(
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                        renderMap(),
                         `accounts/${snakeCase(node.name)}.dart`,
                         renderTemplate('accountsPage.njk', {
                             account: {
@@ -130,7 +131,7 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                     // So that when we generate the serialization logic we know which types needs special handling
                     const programNode = findProgramNodeFromPath(stack.getPath('definedTypeNode'));
                     const structTypeNames = getAllDefinedTypesInNode(programNode);
-                        
+
                     const fields = extractFieldsFromTypeManifest(typeManifest).map(field => {
                         const baseType = getBaseType(field.type).replace(/\?$/, ''); // Remove optional marker `?` for the check
                         return {
@@ -139,7 +140,10 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                         }
                     });
 
-                    return new RenderMap().add(
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+                    return addToRenderMap(
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                        renderMap(),
                         `types/${snakeCase(node.name)}.dart`,
                         renderTemplate('definedTypesPage.njk', {
                             definedType: node,
@@ -215,14 +219,20 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                         typeManifest: typeManifest || { nestedStructs: [] },
                     };
 
-                    return new RenderMap().add(
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+                    return addToRenderMap(
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                        renderMap(),
                         `instructions/${snakeCase(node.name)}.dart`,
                         renderTemplate('instructionsPage.njk', context),
                     );
                 },
 
                 visitPda(node) {
-                    return new RenderMap().add(
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+                    return addToRenderMap(
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                        renderMap(),
                         `pdas/${snakeCase(node.name)}.dart`,
                         renderTemplate('pdasPage.njk', {
                             pda: node,
@@ -230,17 +240,19 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                     );
                 },
 
-                visitProgram(node, { self }) {
-                    const renderMap = new RenderMap()
-                        .mergeWith(...(node.pdas ?? []).map((p: PdaNode) => visit(p, self)))
-                        .mergeWith(...node.accounts.map((account: AccountNode) => visit(account, self)))
-                        .mergeWith(...node.definedTypes.map((type: DefinedTypeNode) => visit(type, self)))
-                        .mergeWith(
-                            ...getAllInstructionsWithSubs(node, {
-                                leavesOnly: !renderParentInstructions,
-                            }).map((ix) => visit(ix, self)),
-                        );
-
+                visitProgram(node, { self }): RenderMap {
+                    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unnecessary-type-assertion */
+                    let renders: RenderMap = mergeRenderMaps([
+                        ...node.accounts.map((n: AccountNode) => visit(n, self) as RenderMap),
+                        ...node.definedTypes.map((n: DefinedTypeNode) => visit(n, self) as RenderMap),
+                        ...node.instructions.map((n) => visit(n, self) as RenderMap),
+                        ...node.pdas.map((n: PdaNode) => visit(n, self) as RenderMap),
+                        ...getAllInstructionsWithSubs(node, {
+                            leavesOnly: !renderParentInstructions,
+                        }).map((ix) => visit(ix, self) as RenderMap),
+                    ]);
+                    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unnecessary-type-assertion */
+                                        
                     if (node.errors.length > 0) {
                         const importsString = new ImportMap().toString(dependencyMap) || '';
                         const errorsContext = {
@@ -249,13 +261,15 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                             program: { name: pascalCase(node.name || '') }
                         };
 
-                        renderMap.add(
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+                        renders = addToRenderMap(
+                            renders,
                             `errors/${snakeCase(node.name)}.dart`,
                             renderTemplate('errorsPage.njk', errorsContext),
                         );
                     }
 
-                    return renderMap;
+                    return renders;
                 },
 
                 visitRoot(node, { self }) {
@@ -283,37 +297,64 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}): Visitor<
                         root: node,
                     };
 
-                    const map = new RenderMap();
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+                    let renders: RenderMap = renderMap();
                     if (accountsToExport.length > 0) {
-                        map.add('shared.dart', renderTemplate('sharedPage.njk', ctx));
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+                        renders = addToRenderMap(renders, 'shared.dart', renderTemplate('sharedPage.njk', ctx));
                     }
                     if (programsToExport.length > 0) {
                         const programsImports = new ImportMap().add('package:solana/solana.dart', new Set(['Ed25519HDPublicKey']));
-                        map.add(
-                            'programs.dart',
-                            renderTemplate('programsMod.njk', {
-                                ...ctx,
-                                imports: programsImports.toString(dependencyMap),
-                            }),
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                        renders = pipe(
+                            renders,
+                            // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+                            r => addToRenderMap(
+                                r,
+                                'programs.dart',
+                                renderTemplate('programsMod.njk', {
+                                    ...ctx,
+                                    imports: programsImports.toString(dependencyMap),
+                                }),
+                            ),
+                            // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+                            r => addToRenderMap(
+                                r,
+                                'errors.dart',
+                                renderTemplate('errorsMod.njk', { ctx })
+                            )
                         );
-                        map.add('errors.dart', renderTemplate('errorsMod.njk', ctx));
-                    }
-                    if (pdasToExport.length > 0) {
-                        map.add('pdas.dart', renderTemplate('pdasMod.njk', ctx));
-                    }
-                    if (accountsToExport.length > 0) {
-                        map.add('accounts.dart', renderTemplate('accountsMod.njk', ctx));
-                    }
-                    if (instructionsToExport.length > 0) {
-                        map.add('instructions.dart', renderTemplate('instructionsMod.njk', ctx));
-                    }
-                    if (definedTypesToExport.length > 0) {
-                        map.add('types.dart', renderTemplate('definedTypesMod.njk', ctx));
                     }
 
-                    return map
-                        .add('lib.dart', renderTemplate('rootMod.njk', ctx))
-                        .mergeWith(...getAllPrograms(node).map((p) => visit(p, self)));
+                    if (pdasToExport.length > 0) {
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+                        renders = addToRenderMap(renders, 'pdas.dart', renderTemplate('pdasMod.njk', ctx));
+                    }
+                    if (accountsToExport.length > 0) {
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+                        renders = addToRenderMap(renders, 'accounts.dart', renderTemplate('accountsMod.njk', ctx));
+                    }
+                    if (instructionsToExport.length > 0) {
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+                        renders = addToRenderMap(renders, 'instructions.dart', renderTemplate('instructionsMod.njk', ctx));
+                    }
+                    if (definedTypesToExport.length > 0) {
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+                        renders = addToRenderMap(renders, 'types.dart', renderTemplate('definedTypesMod.njk', ctx));
+                    }
+
+                    return pipe(
+                        renders,
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+                        (r: RenderMap): RenderMap => addToRenderMap(r, 'mod.dart', renderTemplate('rootMod.njk', ctx)),
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+                        (r: RenderMap): RenderMap => addToRenderMap(r, 'lib.dart', renderTemplate('rootMod.njk', ctx)),
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+                        (r: RenderMap): RenderMap => mergeRenderMaps(
+                            // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+                            [r, ...getAllPrograms(node).map((p) => visit(p, self) as RenderMap)]
+                        ),
+                    );
                 },
             }),
         (v) => recordNodeStackVisitor(v, stack),

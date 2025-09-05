@@ -35,7 +35,7 @@
         "lint": "zx ../../node_modules/@codama/internals/scripts/lint.mjs",
         "lint:fix": "zx ../../node_modules/@codama/internals/scripts/lint.mjs --fix",
         "test": "pnpm test:types && pnpm test:treeshakability && pnpm test:node && pnpm test:e2e && pnpm test:exports",
-        "test:e2e": "./e2e/test.sh",
+        "test:e2e": "./test/e2e/test.sh",
         "test:exports": "node ./test/exports/module.mjs && node ./test/exports/commonjs.cjs",
         "test:node": "zx ../../node_modules/@codama/internals/scripts/test-unit.mjs node",
         "test:treeshakability": "zx ../../node_modules/@codama/internals/scripts/test-treeshakability.mjs",
@@ -46,13 +46,13 @@
         "@codama/nodes": "workspace:*",
         "@codama/renderers-core": "workspace:*",
         "@codama/visitors-core": "workspace:*",
-        "@solana/codecs-strings": "^2.3.0",
         "nunjucks": "^3.2.4",
         "prettier": "^3.6.2"
     },
     "devDependencies": {
         "@codama/nodes-from-anchor": "workspace:*",
-        "@types/nunjucks": "^3.2.6"
+        "@types/nunjucks": "^3.2.6",
+        "@codama/cli": "workspace:*"
     },
     "license": "MIT",
     "repository": {
