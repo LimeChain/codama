@@ -239,30 +239,70 @@ export function getTypeManifestVisitor(options: TypeManifestOptions) {
                 visitNumberType(numberType: NumberTypeNode): TypeManifest {
                     switch (numberType.format) {
                         case 'u8':
-                        case 'u16':
-                        case 'u32':
+                            return {
+                                imports: new ImportMap(),
+                                nestedStructs: [],
+                                type: 'int /* type: u8 */',
+                            };
                         case 'i8':
+                            return {
+                                imports: new ImportMap(),
+                                nestedStructs: [],
+                                type: 'int /* type: i8 */',
+                            };
+                        case 'u16':
+                            return {
+                                imports: new ImportMap(),
+                                nestedStructs: [],
+                                type: 'int /* type: u16 */',
+                            };
                         case 'i16':
+                            return {
+                                imports: new ImportMap(),
+                                nestedStructs: [],
+                                type: 'int /* type: i16 */',
+                            };
+                        case 'u32':
+                            return {
+                                imports: new ImportMap(),
+                                nestedStructs: [],
+                                type: 'int /* type: u32 */',
+                            };
                         case 'i32':
                             return {
                                 imports: new ImportMap(),
                                 nestedStructs: [],
-                                type: 'int',
+                                type: 'int /* type: i32 */',
                             };
                         case 'u64':
+                            return {
+                                imports: new ImportMap(),
+                                nestedStructs: [],
+                                type: 'BigInt /* type: u64 */',
+                            };
                         case 'i64':
+                            return {
+                                imports: new ImportMap(),
+                                nestedStructs: [],
+                                type: 'BigInt /* type: i64 */',
+                            };
                         case 'u128':
+                            return {
+                                imports: new ImportMap(),
+                                nestedStructs: [],
+                                type: 'BigInt /* type: u128 */',
+                            };
                         case 'i128':
                             return {
                                 imports: new ImportMap(),
                                 nestedStructs: [],
-                                type: 'BigInt',
+                                type: 'BigInt /* type: i128 */',
                             };
                         case 'shortU16':
                             return {
                                 imports: new ImportMap(),
                                 nestedStructs: [],
-                                type: 'int',
+                                type: 'int /* type: shortU16 */',
                             };
                         default:
                             throw new Error(`Unknown number format: ${numberType.format}`);

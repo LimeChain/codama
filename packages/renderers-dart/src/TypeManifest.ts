@@ -23,10 +23,11 @@ export type TypeManifestOptions = {
 export interface TypeManifestField {
   baseType: string;
   field: string;
+  format?: string; // Since dart have `int` or `BigInt` i need to know the original format to handle the borsh read/write
   name: string;
   nesting: number;
   optional: boolean;
-  size?: number;
+  size?: number; // In case of fixed-sized i need to know the size to handle the borsh read/write
   type: string;
 }
 
@@ -38,15 +39,22 @@ export function extractFieldsFromTypeManifest(typeManifest: TypeManifest): TypeM
         .split('\n')
         .map((line): TypeManifestField | null => {
             // That handles lines like: final Uint8List fieldName; and extracts the type and name in order to be used from borsh readers/writers
-            const match = line.trim().match(/^final\s+([\w<>, ?]+)(?:\s*\/\*\s*length:\s*\d+\s*\*\/)?\s+(\w+);$/);
+            const match = line.trim().match(/^final\s+([\w<>, ?]+)(?:\s*\/\*.*?\*\/)*\s+(\w+);$/);
             if (match && match[2] !== 'discriminator') {
                 let size: number | undefined; // Placeholder for size extraction logic if needed
+                let format: string | undefined; // Placeholder for format extraction logic if needed
+
                 const isOptional = /\?$/.test(match[1].trim()); // check if the string ends with a '?'
                 const rawType = match[1].replace(/\?$/, '').trim();
                 
                 const lengthMatch = line.match(/\/\*\s*length:\s*(\d+)\s*\*\//); // Extract length if present
                 if (lengthMatch) {
                     size = parseInt(lengthMatch[1]);
+                }
+
+                const typeMatch = line.match(/\/\*\s*type:\s*([\w<>, ?]+)\s*\*\//); // Extract type if present
+                if (typeMatch) {
+                    format = typeMatch[1].trim();
                 }
 
                 // Count nesting depth of List<>
@@ -62,6 +70,7 @@ export function extractFieldsFromTypeManifest(typeManifest: TypeManifest): TypeM
                 return {
                     baseType: inner.trim(),
                     field: line,
+                    format: format,
                     name: match[2],
                     nesting,
                     optional: isOptional, 
