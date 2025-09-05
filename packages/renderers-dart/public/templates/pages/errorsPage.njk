@@ -1,0 +1,58 @@
+{% extends "layout.njk" %}
+{% import "macros.njk" as macros %}
+
+{% block main %}
+{{ imports }}
+
+/// Error codes for the {{ program.name | pascalCase }} program.
+class {{ program.name | pascalCase }}ErrorCode {
+  {% for error in errors | sort(false, false, 'code') %}
+  /// {{ error.message }}
+  static const int {{ error.name | pascalCase }} = 0x{{ error.code.toString(16) | upper }};
+  {% endfor %}
+}
+
+/// Base class for all {{ program.name | pascalCase }} program errors.
+abstract class {{ program.name | pascalCase }}Error extends Error {
+  /// The numerical error code.
+  final int code;
+  
+  /// Human-readable error message.
+  final String message;
+
+  /// Creates a new {{ program.name | pascalCase }}Error.
+  {{ program.name | pascalCase }}Error(this.code, this.message);
+
+  /// Creates a {{ program.name | pascalCase }}Error from a raw error code.
+  static {{ program.name | pascalCase }}Error fromCode(int code) {
+    switch (code) {
+      {% for error in errors | sort(false, false, 'code') %}
+      case {{ program.name | pascalCase }}ErrorCode.{{ error.name | pascalCase }}:
+        return {{ error.name | pascalCase }}Error();
+      {% endfor %}
+      default:
+        return UnknownError(code);
+    }
+  }
+
+  @override
+  String toString() => '$runtimeType: [$code] $message';
+}
+
+/// Represents an unknown error from the {{ program.name | pascalCase }} program.
+class UnknownError extends {{ program.name | pascalCase }}Error {
+  /// Creates a new UnknownError.
+  UnknownError(int code) : super(code, 'Unknown error');
+}
+
+{% for error in errors | sort(false, false, 'code') %}
+/// {{ error.message }}
+class {{ error.name | pascalCase }}Error extends {{ program.name | pascalCase }}Error {
+  /// Creates a new {{ error.name | pascalCase }}Error.
+  {{ error.name | pascalCase }}Error() : super(
+    {{ program.name | pascalCase }}ErrorCode.{{ error.name | pascalCase }},
+    '{{ error.message }}',
+  );
+}
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "layout.njk" %}
+{% import "macros.njk" as macros %}
+
+{% block main %}
+// This file exports instruction classes for all instructions in the SDK.
+
+{% for instruction in instructionsToExport %}
+export 'instructions/{{ instruction.name | snakeCase }}.dart';
+{% endfor %}
+{% endblock %}

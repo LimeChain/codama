@@ -1,0 +1,10 @@
+{% extends "layout.njk" %}
+{% import "macros.njk" as macros %}
+
+{% block main %}
+// This file exports account classes for all accounts in the SDK.
+
+{% for account in accountsToExport %}
+export 'accounts/{{ account.name | snakeCase }}.dart';
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,319 @@
+{% extends "layout.njk" %}
+{% import "macros.njk" as macros %}
+
+{% block main %}
+// Shared utilities and types for the SDK.
+
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:solana/solana.dart';
+
+/// Account not found error.
+class AccountNotFoundError extends Error {
+  /// The address of the account that was not found.
+  final Ed25519HDPublicKey address;
+
+  /// Creates a new AccountNotFoundError.
+  AccountNotFoundError(this.address);
+
+  @override
+  String toString() => 'Account not found: $address';
+}
+
+/// Binary reader for decoding Borsh-encoded data.
+class BinaryReader {
+  final ByteData _data;
+  int _offset = 0;
+
+  /// Creates a new BinaryReader.
+  BinaryReader(this._data);
+
+  /// Reads a boolean value.
+  bool readBool() {
+    final value = _data.getUint8(_offset) != 0;
+    _offset += 1;
+    return value;
+  }
+
+  /// Reads an unsigned 8-bit integer.
+  int readU8() {
+    final value = _data.getUint8(_offset);
+    _offset += 1;
+    return value;
+  }
+
+  /// Reads an unsigned 16-bit integer.
+  int readU16() {
+    final value = _data.getUint16(_offset, Endian.little);
+    _offset += 2;
+    return value;
+  }
+
+  /// Reads an unsigned 32-bit integer.
+  int readU32() {
+    final value = _data.getUint32(_offset, Endian.little);
+    _offset += 4;
+    return value;
+  }
+
+  /// Reads an unsigned 64-bit integer.
+  BigInt readU64() {
+    final low = _data.getUint32(_offset, Endian.little);
+    final high = _data.getUint32(_offset + 4, Endian.little);
+    _offset += 8;
+    return (BigInt.from(high) << 32) | BigInt.from(low);
+  }
+
+  /// Reads a signed 8-bit integer.
+  int readI8() {
+    final value = _data.getInt8(_offset);
+    _offset += 1;
+    return value;
+  }
+
+  /// Reads a signed 16-bit integer.
+  int readI16() {
+    final value = _data.getInt16(_offset, Endian.little);
+    _offset += 2;
+    return value;
+  }
+
+  /// Reads a signed 32-bit integer.
+  int readI32() {
+    final value = _data.getInt32(_offset, Endian.little);
+    _offset += 4;
+    return value;
+  }
+
+  /// Reads a signed 64-bit integer.
+  BigInt readI64() {
+    final low = _data.getUint32(_offset, Endian.little);
+    final high = _data.getInt32(_offset + 4, Endian.little);
+    _offset += 8;
+    return (BigInt.from(high) << 32) | BigInt.from(low);
+  }
+
+  /// Reads a string.
+  String readString() {
+    final length = readU32();
+    final bytes = Uint8List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length;
+    return utf8.decode(bytes);
+  }
+
+  /// Reads a fixed-size u8 array of bytes.
+  Uint8List readFixedU8Array(int length) {
+    final bytes =
+        Uint8List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length;
+    return bytes;
+  }
+
+  /// Reads a fixed-size i8 array of bytes.
+  Int8List readFixedI8Array(int length) {
+    final bytes =
+        Int8List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length;
+    return bytes;
+  }
+
+  /// Reads a fixed-size u16 array of bytes.
+  Uint16List readFixedU16Array(int length) {
+    final bytes =
+        Uint16List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length * 4;
+    return bytes;
+  }
+
+  /// Reads a fixed-size i16 array of bytes.
+  Int16List readFixedI16Array(int length) {
+    final bytes =
+        Int16List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length * 4;
+    return bytes;
+  }
+
+  /// Reads a fixed-size u32 array of bytes.
+  Uint32List readFixedU32Array(int length) {
+    final bytes =
+        Uint32List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length * 4;
+    return bytes;
+  }
+
+  /// Reads a fixed-size i32 array of bytes.
+  Int32List readFixedI32Array(int length) {
+    final bytes =
+        Int32List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length * 4;
+    return bytes;
+  }
+
+  /// Reads a fixed-size u64 array of bytes.
+  Uint64List readFixedU64Array(int length) {
+    final bytes =
+        Uint64List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length * 4;
+    return bytes;
+  }
+
+  /// Reads a fixed-size i64 array of bytes.
+  Int64List readFixedI64Array(int length) {
+    final bytes =
+        Int64List.view(_data.buffer, _data.offsetInBytes + _offset, length);
+    _offset += length * 4;
+    return bytes;
+  }
+
+  /// Reads a variable-length array of generic items.
+  List<T> readArray<T>(T Function() itemReader) {
+    final count = readU32();
+    final result = <T>[];
+    for (var i = 0; i < count; i++) {
+      result.add(itemReader());
+    }
+    return result;
+  }
+
+  /// Reads a variable-length array of bytes.
+  Uint8List readBytes() {
+    final length = readU32();
+    return readFixedU8Array(length);
+  }
+}
+
+/// Binary writer for encoding Borsh data.
+class BinaryWriter {
+  final List<int> _bytes = [];
+
+  /// Writes a boolean value.
+  void writeBool(bool value) {
+    _bytes.add(value ? 1 : 0);
+  }
+
+  /// Writes an unsigned 8-bit integer.
+  void writeU8(int value) {
+    _bytes.add(value & 0xFF);
+  }
+
+  /// Writes an unsigned 16-bit integer.
+  void writeU16(int value) {
+    _bytes.addAll([
+      value & 0xFF,
+      (value >> 8) & 0xFF,
+    ]);
+  }
+
+  /// Writes an unsigned 32-bit integer.
+  void writeU32(int value) {
+    _bytes.addAll([
+      value & 0xFF,
+      (value >> 8) & 0xFF,
+      (value >> 16) & 0xFF,
+      (value >> 24) & 0xFF,
+    ]);
+  }
+
+  /// Writes an unsigned 64-bit integer.
+  void writeU64(BigInt value) {
+    final low = value & BigInt.from(0xFFFFFFFF);
+    final high = (value >> 32) & BigInt.from(0xFFFFFFFF);
+    
+    _bytes.addAll([
+      low.toInt() & 0xFF,
+      (low.toInt() >> 8) & 0xFF,
+      (low.toInt() >> 16) & 0xFF,
+      (low.toInt() >> 24) & 0xFF,
+      high.toInt() & 0xFF,
+      (high.toInt() >> 8) & 0xFF,
+      (high.toInt() >> 16) & 0xFF,
+      (high.toInt() >> 24) & 0xFF,
+    ]);
+  }
+
+  /// Writes a signed 8-bit integer.
+  void writeI8(int value) {
+    writeU8(value & 0xFF);
+  }
+
+  /// Writes a signed 16-bit integer.
+  void writeI16(int value) {
+    writeU16(value & 0xFFFF);
+  }
+
+  /// Writes a signed 32-bit integer.
+  void writeI32(int value) {
+    writeU32(value & 0xFFFFFFFF);
+  }
+
+  /// Writes a signed 64-bit integer.
+  void writeI64(BigInt value) {
+    writeU64(value & (BigInt.one << 64) - BigInt.one);
+  }
+
+  /// Writes a string.
+  void writeString(String value) {
+    final bytes = utf8.encode(value);
+    writeU32(bytes.length);
+    _bytes.addAll(bytes);
+  }
+
+  /// Writes a fixed-size u8 array of bytes.
+  void writeFixedU8Array(Uint8List value) {
+    _bytes.addAll(value);
+  }
+
+  /// Writes a fixed-size i8 array of bytes.
+  void writeFixedI8Array(Int8List value) {
+    _bytes.addAll(value);
+  }
+
+  /// Writes a fixed-size u16 array of bytes.
+  void writeFixedU16Array(Uint16List value) {
+    _bytes.addAll(value);
+  }
+
+  /// Writes a fixed-size i16 array of bytes.
+  void writeFixedI16Array(Int16List value) {
+    _bytes.addAll(value);
+  }
+  
+  /// Writes a fixed-size u32 array of bytes.
+  void writeFixedU32Array(Uint32List value) {
+    _bytes.addAll(value);
+  }
+
+  /// Writes a fixed-size i32 array of bytes.
+  void writeFixedI32Array(Int32List value) {
+    _bytes.addAll(value);
+  }
+
+  /// Writes a fixed-size u64 array of bytes.
+  void writeFixedU64Array(Uint64List value) {
+    _bytes.addAll(value);
+  }
+
+  /// Writes a fixed-size i64 array of bytes.
+  void writeFixedI64Array(Int64List value) {
+    _bytes.addAll(value);
+  }
+
+  /// Writes a variable-length array of bytes.
+  void writeBytes(Uint8List value) {
+    writeU32(value.length);
+    _bytes.addAll(value);
+  }
+
+  /// Writes a variable-length array of generic items.
+  void writeArray<T>(List<T> items, void Function(T) itemWriter) {
+    writeU32(items.length);
+    for (final item in items) {
+      itemWriter(item);
+    }
+  }
+
+  /// Returns the byte array.
+  Uint8List toBytes() => Uint8List.fromList(_bytes);
+}
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends "layout.njk" %}
+{% import "macros.njk" as macros %}
+
+{% block main %}
+{{ imports }}
+
+/// Generated type definition for {{ definedType.name | pascalCase }}.
+///
+{% if definedType.docs.length > 0 %}
+{% for doc in definedType.docs %}
+/// {{ doc }}
+{% endfor %}
+{% endif %}
+{{ typeManifest.type | safe }}
+
+{% if definedType.kind === 'enumTypeNode' %}
+/// Extension providing serialization methods for {{ definedType.name | pascalCase }}.
+///
+extension {{ definedType.name | pascalCase }}Borsh on {{ definedType.name | pascalCase }} {
+  /// Converts the enum to a byte representation.
+  void toBorsh(BinaryWriter writer) {
+    // Write the enum discriminator
+    writer.writeU8(index);
+    
+    {% if definedType.variants[0].kind !== 'enumEmptyVariantTypeNode' %}
+    // Write the variant data
+    switch (this) {
+      {% for variant in definedType.variants %}
+      case {{ definedType.name | pascalCase }}.{{ variant.name | camelCase }}:
+        {% if variant.kind === 'enumStructVariantTypeNode' %}
+        value.toBorsh(writer);
+        {% elif variant.kind === 'enumTupleVariantTypeNode' %}
+        {% for field in variant.fields %}
+        writer.write{{ field.typeManifest.type | typeToWriterMethod }}(value{% if variant.fields.length > 1 %}.${{ loop.index0 }}{% endif %});
+        {% endfor %}
+        {% endif %}
+        break;
+      {% endfor %}
+    }
+    {% endif %}
+  }
+
+  /// Creates an enum from a byte representation.
+  static {{ definedType.name | pascalCase }} fromBorsh(BinaryReader reader) {
+    final discriminator = reader.readU8();
+    
+    switch (discriminator) {
+      {% for variant in definedType.variants %}
+      case {{ loop.index0 }}:
+        {% if variant.kind === 'enumEmptyVariantTypeNode' %}
+        return {{ definedType.name | pascalCase }}.{{ variant.name | camelCase }};
+        {% elif variant.kind === 'enumStructVariantTypeNode' %}
+        return {{ definedType.name | pascalCase }}.{{ variant.name | camelCase }}(
+          {{ variant.struct.name | pascalCase }}.fromBorsh(reader)
+        );
+        {% elif variant.kind === 'enumTupleVariantTypeNode' %}
+        return {{ definedType.name | pascalCase }}.{{ variant.name | camelCase }}(
+          {% for field in variant.fields %}
+          reader.read{{ field.typeManifest.type | typeToReaderMethod }}(){% if not loop.last %},{% endif %}
+          {% endfor %}
+        );
+        {% endif %}
+      {% endfor %}
+      default:
+        throw FormatException('Invalid discriminator for {{ definedType.name | pascalCase }}: $discriminator');
+    }
+  }
+}
+
+{% elif definedType.type.kind === 'structTypeNode' %}
+/// Extension providing serialization methods for {{ definedType.name | pascalCase }}.
+///
+extension {{ definedType.name | pascalCase }}Borsh on {{ definedType.name | pascalCase }} {
+  /// Serializes the struct to its byte representation.
+  void toBorsh(BinaryWriter writer) {
+    {% for field in definedType.type.fields %}
+    {% if field.type.kind === 'numberTypeNode' %}
+    writer.writeU{{ field.type.format | replace('u', '') }}({{ field.name | camelCase }});
+    {% elif field.type.kind === 'stringTypeNode' %}
+    writer.writeString({{ field.name | camelCase }});
+    {% elif field.type.kind === 'sizePrefixTypeNode' and field.type.type.kind === 'stringTypeNode' %}
+    writer.writeString({{ field.name | camelCase }});
+    {% elif field.type.kind === 'booleanTypeNode' %}
+    writer.writeBool({{ field.name | camelCase }});
+    {% elif field.type.kind === 'publicKeyTypeNode' %}
+    writer.writeFixedU8Array({{ field.name | camelCase }}.toBytes());
+    {% elif field.type.kind === 'bytesTypeNode' %}
+    writer.writeBytes({{ field.name | camelCase }});
+    {% else %}
+    {{ field.name | camelCase }}.toBorsh(writer);
+    {% endif %}
+    {% endfor %}
+  }
+
+  /// Creates a struct from its byte representation.
+  static {{ definedType.name | pascalCase }} fromBorsh(BinaryReader reader) {
+    return {{ definedType.name | pascalCase }}(
+      {% for field in definedType.type.fields %}
+      {% if field.type.kind === 'numberTypeNode' %}
+      {{ field.name | camelCase }}: reader.readU{{ field.type.format | replace('u', '') }}(),
+      {% elif field.type.kind === 'stringTypeNode' %}
+      {{ field.name | camelCase }}: reader.readString(),
+      {% elif field.type.kind === 'sizePrefixTypeNode' and field.type.type.kind === 'stringTypeNode' %}
+      {{ field.name | camelCase }}: reader.readString(),
+      {% elif field.type.kind === 'booleanTypeNode' %}
+      {{ field.name | camelCase }}: reader.readBool(),
+      {% elif field.type.kind === 'publicKeyTypeNode' %}
+      {{ field.name | camelCase }}: PublicKey.fromBytes(reader.readFixedU32Array(32)),
+      {% elif field.type.kind === 'bytesTypeNode' %}
+      {{ field.name | camelCase }}: reader.readBytes(),
+      {% else %}
+      {{ field.name | camelCase }}: {{ field.type.type }}.fromBorsh(reader),
+      {% endif %}
+      {% endfor %}
+    );
+  }
+}
+
+{% endif %}
+
+{% for nestedStruct in typeManifest.nestedStructs %}
+{{ nestedStruct }}
+{% endfor %}
+{% endblock %}
