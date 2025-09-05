@@ -38,10 +38,10 @@
 
 {# Recursive Borsh Reader, responsible for handling collections and any nested levels #}
 {% macro borshReader(field) %}  
-  {{ recursiveReader(field.nesting, field.baseType, field.isStruct, field.size) }}
+  {{ recursiveReader(field.nesting, field.baseType, field.isStruct, field.size, field.format) }}
 {% endmacro %}
 
-{% macro recursiveReader(depth, baseType, isStruct, size) %}
+{% macro recursiveReader(depth, baseType, isStruct, size, format) %}
   {% if depth > 5 %}
     // ERROR: Nesting depth exceeds supported limit (5)
     throw Exception('Nesting depth exceeds supported limit(5)');
@@ -49,7 +49,7 @@
     {% if isStruct %}
       {{ baseType }}Borsh.fromBorsh(reader)
     {% else %}
-      {{ baseTypeReader(baseType, false, size) }}
+      {{ baseTypeReader(baseType, false, size, format) }}
     {% endif %}
   {% else %}
     reader.readArray(() {
@@ -57,18 +57,76 @@
         // item is a struct, call fromBorsh per item
         return {{ baseType }}Borsh.fromBorsh(reader);
       {% else %}
-        return {{ recursiveReader(depth - 1, baseType, false, size) }};
+        return {{ recursiveReader(depth - 1, baseType, false, size, format) }};
       {% endif %}
     })
   {% endif %}
 {% endmacro %}
 
+{% macro intFormatUtil(format, isWrite, varName='value') %}
+  {% if format == 'u8' %}
+    {% if isWrite %}
+      writer.writeU8({{ varName }})
+    {% else %}
+      reader.readU8()
+    {% endif %}
+  {% elif format == 'i8' %}
+    {% if isWrite %}
+      writer.writeI8({{ varName }})
+    {% else %}
+      reader.readI8()
+    {% endif %}
+  {% elif format == 'u16' %}
+    {% if isWrite %}
+      writer.writeU16({{ varName }})
+    {% else %}
+      reader.readU16()
+    {% endif %}
+  {% elif format == 'i16' %}
+    {% if isWrite %}
+      writer.writeI16({{ varName }})
+    {% else %}
+      reader.readI16()
+    {% endif %}
+  {% elif format == 'u32' %}
+    {% if isWrite %}
+      writer.writeU32({{ varName }})
+    {% else %}
+      reader.readU32()
+    {% endif %}
+  {% elif format == 'i32' %}
+    {% if isWrite %}
+      writer.writeI32({{ varName }})
+    {% else %}
+      reader.readI32()
+    {% endif %}
+  {% elif format == 'u64' %}
+    {% if isWrite %}
+      writer.writeU64({{ varName }})
+    {% else %}
+      reader.readU64()
+    {% endif %}
+  {% elif format == 'i64' %}
+    {% if isWrite %}
+      writer.writeI64({{ varName }})
+    {% else %}
+      reader.readI64()
+    {% endif %}
+  {% elif format == 'u128' or format == 'i128' %}
+    {% if isWrite %}
+      writer.writeBigInt({{ varName }})
+    {% else %}
+      reader.readBigInt()
+    {% endif %}
+  {% else %}
+    throw Exception('Unsupported number format: {{ format }}');
+  {% endif %}
+{% endmacro %}
+
 {# Reader for the base types (no nesting) #}
-{% macro baseTypeReader(baseType, isStruct, size) %}
-  {% if baseType == 'int' %}
-    reader.readInt()
-  {% elif baseType == 'BigInt' %}
-    reader.readBigInt()
+{% macro baseTypeReader(baseType, isStruct, size, format) %}
+  {% if baseType == 'int' or baseType == 'BigInt' %}
+    {{ intFormatUtil(format, false) }}
   {% elif baseType == 'String' %}
     reader.readString()
   {% elif baseType == 'Uint8List' %}
@@ -100,10 +158,10 @@
 {# Recursive Borsh Writer, responsible to handle nested type of collections  #}
 {% macro borshWriter(field, overrideFieldName="") %}
   {% set name = overrideFieldName if overrideFieldName else field.name %}
-  {{ recursiveWriter(name, field.nesting, field.baseType, field.isStruct, field.size) }}
+  {{ recursiveWriter(name, field.nesting, field.baseType, field.isStruct, field.size, field.format) }}
 {% endmacro %}
 
-{% macro recursiveWriter(varName, depth, baseType, isStruct, size) %}
+{% macro recursiveWriter(varName, depth, baseType, isStruct, size, format) %}
   {% if depth > 5 %}
     // ERROR: Nesting depth exceeds supported limit (5)
     throw Exception('Nesting depth exceeds supported limit(5)');
@@ -112,7 +170,7 @@
       {{ varName }}.toBorsh(writer);
     {% else %}
     {# TODO: I have problem here because of these recursions i put ';' twice because twice is iterated here first trough writeArray and on the recursion i go inside here and i put ';' again #}
-      {{ baseTypeWriter(baseType, varName, size) }};
+      {{ baseTypeWriter(baseType, varName, size, format) }};
     {% endif %}
   {% else %}
     writer.writeArray<{{ baseType }}>({{ varName }}, ({{ baseType }} item) {
@@ -120,18 +178,16 @@
         // Each item is a struct
         item.toBorsh(writer);
       {% else %}
-        {{ recursiveWriter("item", depth - 1, baseType, false, size) }};
+        {{ recursiveWriter("item", depth - 1, baseType, false, size, format) }};
       {% endif %}
     });
   {% endif %}
 {% endmacro %}
 
 {# Base Writer, no nested types inside #}
-{% macro baseTypeWriter(baseType, varName, size) %}
-  {% if baseType == 'int' %}
-    writer.writeInt({{ varName }})
-  {% elif baseType == 'BigInt' %}
-    writer.writeBigInt({{ varName }})
+{% macro baseTypeWriter(baseType, varName, size, format) %}
+  {% if baseType == 'int' or baseType == 'BigInt' %}
+    {{ intFormatUtil(format, true, varName) }}
   {% elif baseType == 'String' %}
     writer.writeString({{ varName }})
   {% elif baseType == 'Uint8List' %}
