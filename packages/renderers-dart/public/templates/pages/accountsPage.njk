@@ -35,23 +35,26 @@ class {{ account.name | pascalCase }} {
 static {{ account.name | pascalCase }} fromBorsh(BinaryReader reader) {
   return {{ account.name | pascalCase }}(
     {% for field in fields %}
+      {% if field.optional %}
+        {{ field.name }}: reader.readU8() == 1 
+          ? {{ macros.borshReader(field) }} 
+          : null,
+      {% else %}
         {{ field.name }}: {{ macros.borshReader(field) }},
+      {% endif %}
     {% endfor %}
   );
 }
 
-
 /// Serializes this account to borsh.
 void toBorsh(BinaryWriter writer) {
   {% for field in fields %}
-    {% if '?' in field.field %}
-      // Optional field
+    {% if field.optional %}
       writer.writeU8({{ field.name }} != null ? 1 : 0);
       if ({{ field.name }} != null) {
         {{ macros.borshWriter(field) | replace(field.name, field.name ~ '!') }}
       }
     {% else %}
-      // Non-optional field
       {{ macros.borshWriter(field) }}
     {% endif %}
   {% endfor %}
