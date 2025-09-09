@@ -100,9 +100,7 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                         }
                     });
 
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
                     return addToRenderMap(
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
                         renderMap(),
                         `accounts/${snakeCase(node.name)}.dart`,
                         renderTemplate('accountsPage.njk', {
@@ -140,9 +138,7 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                         }
                     });
 
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
                     return addToRenderMap(
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
                         renderMap(),
                         `types/${snakeCase(node.name)}.dart`,
                         renderTemplate('definedTypesPage.njk', {
@@ -219,9 +215,7 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                         typeManifest: typeManifest || { nestedStructs: [] },
                     };
 
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
                     return addToRenderMap(
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
                         renderMap(),
                         `instructions/${snakeCase(node.name)}.dart`,
                         renderTemplate('instructionsPage.njk', context),
@@ -229,9 +223,7 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                 },
 
                 visitPda(node) {
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
                     return addToRenderMap(
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
                         renderMap(),
                         `pdas/${snakeCase(node.name)}.dart`,
                         renderTemplate('pdasPage.njk', {
@@ -241,7 +233,7 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                 },
 
                 visitProgram(node, { self }): RenderMap {
-                    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unnecessary-type-assertion */
+                    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unnecessary-type-assertion */
                     let renders: RenderMap = mergeRenderMaps([
                         ...node.accounts.map((n: AccountNode) => visit(n, self) as RenderMap),
                         ...node.definedTypes.map((n: DefinedTypeNode) => visit(n, self) as RenderMap),
@@ -251,7 +243,6 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                             leavesOnly: !renderParentInstructions,
                         }).map((ix) => visit(ix, self) as RenderMap),
                     ]);
-                    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unnecessary-type-assertion */
                                         
                     if (node.errors.length > 0) {
                         const importsString = new ImportMap().toString(dependencyMap) || '';
@@ -261,7 +252,6 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                             program: { name: pascalCase(node.name || '') }
                         };
 
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
                         renders = addToRenderMap(
                             renders,
                             `errors/${snakeCase(node.name)}.dart`,
@@ -297,18 +287,14 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                         root: node,
                     };
 
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
                     let renders: RenderMap = renderMap();
                     if (accountsToExport.length > 0) {
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
                         renders = addToRenderMap(renders, 'shared.dart', renderTemplate('sharedPage.njk', ctx));
                     }
                     if (programsToExport.length > 0) {
                         const programsImports = new ImportMap().add('package:solana/solana.dart', new Set(['Ed25519HDPublicKey']));
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                         renders = pipe(
                             renders,
-                            // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
                             r => addToRenderMap(
                                 r,
                                 'programs.dart',
@@ -317,7 +303,6 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                                     imports: programsImports.toString(dependencyMap),
                                 }),
                             ),
-                            // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
                             r => addToRenderMap(
                                 r,
                                 'errors.dart',
@@ -327,31 +312,23 @@ export function getRenderMapVisitor(options: GetRenderMapOptions = {}) {
                     }
 
                     if (pdasToExport.length > 0) {
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
                         renders = addToRenderMap(renders, 'pdas.dart', renderTemplate('pdasMod.njk', ctx));
                     }
                     if (accountsToExport.length > 0) {
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
                         renders = addToRenderMap(renders, 'accounts.dart', renderTemplate('accountsMod.njk', ctx));
                     }
                     if (instructionsToExport.length > 0) {
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
                         renders = addToRenderMap(renders, 'instructions.dart', renderTemplate('instructionsMod.njk', ctx));
                     }
                     if (definedTypesToExport.length > 0) {
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
                         renders = addToRenderMap(renders, 'types.dart', renderTemplate('definedTypesMod.njk', ctx));
                     }
 
                     return pipe(
                         renders,
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
                         (r: RenderMap): RenderMap => addToRenderMap(r, 'mod.dart', renderTemplate('rootMod.njk', ctx)),
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
                         (r: RenderMap): RenderMap => addToRenderMap(r, 'lib.dart', renderTemplate('rootMod.njk', ctx)),
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
                         (r: RenderMap): RenderMap => mergeRenderMaps(
-                            // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
                             [r, ...getAllPrograms(node).map((p) => visit(p, self) as RenderMap)]
                         ),
                     );
